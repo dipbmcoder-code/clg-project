@@ -1,0 +1,111 @@
+services:
+  strapi:
+    build:
+      context: ./cms-strapi
+      dockerfile: Dockerfile
+    container_name: strapi-app
+    restart: unless-stopped
+    expose:
+      - "1337"
+    env_file:
+      - .env
+    environment:
+      NODE_ENV: production
+      VIRTUAL_HOST: fbstp.africasoccer.com
+      LETSENCRYPT_HOST: fbstp.africasoccer.com
+      LETSENCRYPT_EMAIL: jaivinpatel@tricoreitsolutions.com
+      HTTPS_METHOD: redirect
+    depends_on:
+      - db
+
+  db:
+    image: postgres:17
+    container_name: strapi-db
+    restart: unless-stopped
+    env_file:
+      - .env
+    environment:
+      POSTGRES_USER: ${DATABASE_USERNAME}
+      POSTGRES_PASSWORD: ${DATABASE_PASSWORD}
+      POSTGRES_DB: ${DATABASE_NAME}
+    ports:
+      - "5433:5432"
+    volumes:
+      - ${POSTGRES_DATA_PATH}:/var/lib/postgresql/data
+
+  # ===========================
+  # Next.js Admin Dashboard
+  # ===========================
+  admin-dashboard:
+    build:
+      context: ./admin-dashboard
+      dockerfile: Dockerfile
+      args:
+        NEXT_PUBLIC_STRAPI_API_URL: ${NEXT_PUBLIC_STRAPI_API_URL}
+    container_name: nextjs-admin
+    restart: unless-stopped
+    expose:
+      - "3033"
+    env_file:
+      - .env
+    environment:
+      - NEXT_PUBLIC_STRAPI_API_URL=${NEXT_PUBLIC_STRAPI_API_URL}
+      - VIRTUAL_HOST=fbadmin.africasoccer.com
+      - LETSENCRYPT_HOST=fbadmin.africasoccer.com
+      - LETSENCRYPT_EMAIL=jaivinpatel@tricoreitsolutions.com
+      - HTTPS_METHOD=redirect
+    depends_on:
+      - strapi
+
+  # ===========================
+  # Python News Engine
+  # ===========================
+  news-engine:
+    build:
+      context: ./news-engine
+      dockerfile: Dockerfile
+    container_name: news-engine
+    restart: unless-stopped
+    expose:
+      - "8000"
+    env_file:
+      - .env
+    environment:
+      - VIRTUAL_HOST=fbpyapi.africasoccer.com
+      - LETSENCRYPT_HOST=fbpyapi.africasoccer.com
+      - LETSENCRYPT_EMAIL=jaivinpatel@tricoreitsolutions.com
+      - HTTPS_METHOD=redirect
+    depends_on:
+      - python-db
+    volumes:
+      - ./news-engine:/app
+
+  # 🕒 Cron scheduler container
+  news-engine-cron:
+    build:
+      context: ./news-engine
+      dockerfile: Dockerfile
+    container_name: news-engine-cron
+    command: ["python3", "-u", "cron_all.py"]  # -u flag for unbuffered output
+    restart: unless-stopped
+    env_file:
+      - .env
+    environment:
+      - PYTHONUNBUFFERED=1  # Ensure unbuffered output for logs
+    depends_on:
+      - python-db
+    volumes:
+      - ./news-engine:/app
+
+  python-db:
+    image: postgres:17
+    container_name: python-db
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${DB_USER}
+      POSTGRES_PASSWORD: ${DB_PASSWORD}
+      POSTGRES_DB: ${DB_NAME}
+    ports:
+      - "5444:5432"
+    volumes:
+      - ${PYTHON_DB_DATA_PATH}:/var/lib/postgresql/data

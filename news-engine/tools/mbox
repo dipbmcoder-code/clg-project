@@ -1,0 +1,51 @@
+From root@server1.botbot.news  Sun Oct 16 10:07:14 2022
+Return-Path: <root@server1.botbot.news>
+X-Original-To: root
+Delivered-To: root@server1.botbot.news
+Received: by server1.botbot.news (Postfix, from userid 0)
+	id 3036AE2F2E; Sun, 16 Oct 2022 10:07:14 +0000 (UTC)
+From: root@server1.botbot.news (Cron Daemon)
+To: root@server1.botbot.news
+Subject: Cron <root@server1> python3 /root/football_bot/preview/main_preview.py
+MIME-Version: 1.0
+Content-Type: text/plain; charset=UTF-8
+Content-Transfer-Encoding: 8bit
+X-Cron-Env: <SHELL=/bin/sh>
+X-Cron-Env: <HOME=/root>
+X-Cron-Env: <PATH=/usr/bin:/bin>
+X-Cron-Env: <LOGNAME=root>
+Message-Id: <20221016100714.3036AE2F2E@server1.botbot.news>
+Date: Sun, 16 Oct 2022 10:07:14 +0000 (UTC)
+X-IMAPbase: 1665914812 1694
+Status: O
+X-UID: 1096
+
+['2022-10-16T13:00', '2022-10-16T13:00', '2022-10-16T13:00', '2022-10-16T13:00', '2022-10-16T15:30', '2022-10-18T18:30', '2022-10-18T19:15', '2022-10-16T13:30', '2022-10-16T15:30', '2022-10-16T17:30', '2022-10-21T18:30', '2022-10-22T13:30', '2022-10-22T13:30', '2022-10-22T13:30', '2022-10-16T11:00', '2022-10-16T13:00', '2022-10-16T13:00', '2022-10-16T13:00', '2022-10-16T13:00', '2022-10-16T15:05', '2022-10-16T18:45', '2022-10-16T10:30', '2022-10-16T13:00', '2022-10-16T13:00', '2022-10-16T16:00', '2022-10-16T18:45', '2022-10-17T16:30', '2022-10-17T18:45', '2022-10-16T12:00', '2022-10-16T14:15', '2022-10-16T16:30', '2022-10-16T19:00', '2022-10-17T19:00', '2022-10-18T17:00', '2022-10-18T18:00', '2022-10-21T19:15', '2022-10-22T14:30', '2022-10-22T17:00', '2022-10-22T19:30', '2022-10-23T14:30', '2022-10-23T14:30', '2022-10-23T17:00']
+[868046, 868049, 868052, 868053, 868051, 868059, 868062, 871248, 871247, 871245, 871257, 871254, 871255, 871256, 871578, 871570, 871573, 871577, 871579, 871571, 871574, 881873, 881874, 881878, 881876, 881872, 881877, 881875, 878023, 878026, 878025, 878031, 878030, 878035, 878037, 898692, 898690, 898688, 898686, 898685, 898691, 898693]
+868046
+868046
+Traceback (most recent call last):
+  File "/root/football_bot/preview/main_preview.py", line 181, in <module>
+    save_aws(fixture_m[check_time], 'preview')
+  File "/root/football_bot/preview/save_img_aws.py", line 19, in save_aws
+    client.upload_file(f'/root/result/img_match/graph_away_{fixture_match}_{types}.png', 'buckets-botbot-football', f'match/graph_away_{fixture_match}_{types}.png', ExtraArgs={'ACL':'public-read'})
+  File "/root/.local/lib/python3.8/site-packages/boto3/s3/inject.py", line 129, in upload_file
+    return transfer.upload_file(
+  File "/root/.local/lib/python3.8/site-packages/boto3/s3/transfer.py", line 279, in upload_file
+    future.result()
+  File "/root/.local/lib/python3.8/site-packages/s3transfer/futures.py", line 73, in result
+    return self._coordinator.result()
+  File "/root/.local/lib/python3.8/site-packages/s3transfer/futures.py", line 233, in result
+    raise self._exception
+  File "/root/.local/lib/python3.8/site-packages/s3transfer/tasks.py", line 255, in _main
+    self._submit(transfer_future=transfer_future, **kwargs)
+  File "/root/.local/lib/python3.8/site-packages/s3transfer/upload.py", line 549, in _submit
+    upload_input_manager.provide_transfer_size(transfer_future)
+  File "/root/.local/lib/python3.8/site-packages/s3transfer/upload.py", line 236, in provide_transfer_size
+    self._osutil.get_file_size(
+  File "/root/.local/lib/python3.8/site-packages/s3transfer/utils.py", line 228, in get_file_size
+    return os.path.getsize(filename)
+  File "/usr/lib/python3.8/genericpath.py", line 50, in getsize
+    return os.stat(filename).st_size
+FileNotFoundError: [Errno 2] No such file or directory: '/root/result/img_match/graph_away_868046_preview.png'
+

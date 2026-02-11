@@ -1,0 +1,51 @@
+{
+  "kind": "collectionType",
+  "collectionName": "news_logs",
+  "info": {
+    "singularName": "news-log",
+    "pluralName": "news-logs",
+    "displayName": "News Log"
+  },
+  "options": {
+    "draftAndPublish": true
+  },
+  "pluginOptions": {},
+  "attributes": {
+    "news_type": {
+      "type": "enumeration",
+      "enum": [
+        "preview",
+        "review",
+        "player_abroad",
+        "player_profile",
+        "transfer",
+        "rumour",
+        "where_to_Watch",
+        "social_media"
+      ]
+    },
+    "title": {
+      "type": "text"
+    },
+    "website_name": {
+      "type": "string"
+    },
+    "news_status": {
+      "type": "enumeration",
+      "enum": [
+        "Published",
+        "Failed",
+        "Partial"
+      ]
+    },
+    "log_time": {
+      "type": "string"
+    },
+    "image_generated": {
+      "type": "boolean"
+    },
+    "log_message": {
+      "type": "json"
+    }
+  }
+}

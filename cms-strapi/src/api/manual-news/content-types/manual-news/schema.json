@@ -1,0 +1,74 @@
+{
+  "kind": "collectionType",
+  "collectionName": "manual_newses",
+  "info": {
+    "singularName": "manual-news",
+    "pluralName": "manual-newses",
+    "displayName": "manual news"
+  },
+  "options": {
+    "draftAndPublish": true
+  },
+  "pluginOptions": {},
+  "attributes": {
+    "news_type": {
+      "type": "enumeration",
+      "enum": [
+        "match_reviews",
+        "match_previews"
+      ]
+    },
+    "home_team": {
+      "type": "string"
+    },
+    "home_score": {
+      "type": "integer"
+    },
+    "home_team_position": {
+      "type": "string"
+    },
+    "away_team": {
+      "type": "string"
+    },
+    "away_score": {
+      "type": "integer"
+    },
+    "league": {
+      "type": "json"
+    },
+    "away_team_position": {
+      "type": "string"
+    },
+    "summary": {
+      "type": "text"
+    },
+    "goalscorers": {
+      "type": "json"
+    },
+    "websites_news": {
+      "type": "relation",
+      "relation": "oneToMany",
+      "target": "api::websites-news.websites-news",
+      "mappedBy": "manual_new"
+    },
+    "users_websites": {
+      "type": "relation",
+      "relation": "oneToMany",
+      "target": "api::users-website.users-website",
+      "mappedBy": "manual_new"
+    },
+    "venue": {
+      "type": "text"
+    },
+    "match_date": {
+      "type": "datetime"
+    },
+    "players_to_watch": {
+      "type": "json"
+    },
+    "published": {
+      "type": "boolean",
+      "default": false
+    }
+  }
+}
