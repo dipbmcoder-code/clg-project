@@ -1,43 +1,72 @@
+"""
+AI Image Generation for Social Media Posts
+Generates news-style thumbnail images using Gemini/OpenRouter.
+Topic-agnostic — adapts based on website's topic_niche setting.
+"""
 from publication.utils import generate_gemini_image, replace_vars
 
-def generate_tweet_image(twiiter_post, key, l_version, types, website=None):
-    custom_prompt = website.get('data', {}).get('social_media_news_image_prompt') if website else None
+
+def generate_post_image(post_data, key, l_version, types, website=None):
+    """
+    Generate an AI image for a social media post.
     
+    Args:
+        post_data: Standardized post dict
+        key: Unique key for file naming
+        l_version: Language version (eng, ru, etc.)
+        types: Module type string
+        website: Website config dict with prompts and topic_niche
+    """
+    # Get the post content for the prompt
+    post_text = post_data.get("tweet_text", "")
+    post_title = post_data.get("post_title", "")
+    source = post_data.get("source", "x")
+    source_handle = post_data.get("source_handle", "")
+    topic = (website.get("topic_niche") or "general news") if website else "general news"
+
+    # Try custom prompt from website config first
+    custom_prompt = None
+    if website:
+        custom_prompt = website.get("social_media_news_image_prompt")
+
     if custom_prompt:
         prompt_vars = {
-            "tweet_text": twiiter_post['tweet_text']
+            "tweet_text": post_text,
+            "post_title": post_title,
+            "source": source,
+            "source_handle": source_handle,
+            "topic_niche": topic,
         }
         prompt_text = replace_vars(custom_prompt, prompt_vars)
-        prompt = f"Generate a social media image with the following details:\n{prompt_text}"
-    elif l_version == 'eng':
-        prompt = f"""
-        Highly realistic sports breaking news graphic for a major outlet (Sky Sports / BBC Sport / ESPN style), 2025 season.
+        prompt = f"Generate a professional news image:\n{prompt_text}"
 
-        Main headline in large, bold white text with subtle red or blue outline: extract the core news from this official announcement and make it short and punchy (max 8–10 words).
-
-        Full quote from the announcement in clean white text box at the bottom third of the image, easy to read.
-
-        Background: ultra-realistic, high-resolution photograph — choose the most relevant scene from:
-        • packed football stadium at night with floodlights
-        • player holding the new club shirt at official unveiling
-        • manager/coach speaking intensely at press conference
-        • training ground with players celebrating
-        • close-up of player signing contract with club crest visible
-
-        Do NOT use:
-        - gradients, digital art, illustrations, cartoons, abstract effects
-        - fake newspaper layout, phone screen mockups, or social media borders
-        - watermarks, logos, or fake channel bugs
-
-        Colors: dramatic but realistic sports photography tones — keep stadium lights, natural skin tones, authentic kit colors.
-
-        Official announcement to base the graphic on:
-        "{twiiter_post['tweet_text']}"
-
-        Image ratio: 1:1 (1024x1024 or 2048x2048), photorealistic, 8K quality, sharp focus, cinematic lighting.
-        """
     else:
-        prompt = f"Generate a social media image for: {twiiter_post['tweet_text']}"
+        # Default topic-agnostic prompt
+        headline = post_title if post_title else post_text[:200]
+        prompt = f"""
+        Professional, photorealistic news article thumbnail image.
+        
+        Topic: {topic}
+        Headline: "{headline}"
+        
+        Design requirements:
+        - Modern digital news media style (CNN, BBC, Reuters aesthetic)
+        - Clean, professional composition with bold typography
+        - Main headline text: extract the core news in 6-8 words, large bold white text
+        - Relevant background: ultra-realistic photograph matching the topic
+        - Color scheme: professional news media tones (dark blues, whites, subtle red accents)
+        
+        Do NOT use:
+        - Gradients, digital art, illustrations, cartoons, or abstract effects
+        - Fake newspaper layouts, phone mockups, or social media borders
+        - Watermarks, logos, or branding
+        
+        Image ratio: 1:1 (1024x1024), photorealistic, 8K quality, sharp focus, cinematic lighting.
+        """
 
     generate_gemini_image(prompt, key, l_version, types)
+
+
+# Keep backward compatibility alias
+generate_tweet_image = generate_post_image
 

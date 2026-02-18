@@ -23,7 +23,6 @@ import { RouterLink } from 'src/routes/components';
 
 import { useBoolean } from 'src/hooks/use-boolean';
 import useCustomSnackbar from 'src/hooks/use-custom-snackbar';
-import { green, red } from '@mui/material/colors';
 
 import {
   AddIcon,
@@ -35,11 +34,9 @@ import {
 
 import { ActionSwitch, DataGridTable, CustomPagination, TransitionsDialog } from 'src/custom/index';
 
-import Label from 'src/components/label/label';
 import { useSettingsContext } from 'src/components/settings';
-import { min } from 'lodash';
 
-function Websites({ data, pageSizeOptions, sorting, onPageChange, onDelete, onPublish, onCount, onActive }) {
+function Websites({ data, pageSizeOptions, sorting, onPageChange, onDelete, onCount, onActive }) {
   const current_path = usePathname();
   const { customSnackbarAction } = useCustomSnackbar();
   const settings = useSettingsContext();

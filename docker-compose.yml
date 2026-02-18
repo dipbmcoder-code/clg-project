@@ -1,37 +1,28 @@
 services:
-  strapi:
+  # ===========================
+  # Node.js API Backend
+  # ===========================
+  backend:
     build:
-      context: ./cms-strapi
+      context: ./backend
       dockerfile: Dockerfile
-    container_name: strapi-app
+    container_name: ai-news-backend
     restart: unless-stopped
-    expose:
-      - "1337"
-    env_file:
-      - .env
-    environment:
-      NODE_ENV: production
-      VIRTUAL_HOST: fbstp.africasoccer.com
-      LETSENCRYPT_HOST: fbstp.africasoccer.com
-      LETSENCRYPT_EMAIL: jaivinpatel@tricoreitsolutions.com
-      HTTPS_METHOD: redirect
-    depends_on:
-      - db
-
-  db:
-    image: postgres:17
-    container_name: strapi-db
-    restart: unless-stopped
-    env_file:
-      - .env
-    environment:
-      POSTGRES_USER: ${DATABASE_USERNAME}
-      POSTGRES_PASSWORD: ${DATABASE_PASSWORD}
-      POSTGRES_DB: ${DATABASE_NAME}
     ports:
-      - "5433:5432"
-    volumes:
-      - ${POSTGRES_DATA_PATH}:/var/lib/postgresql/data
+      - "4000:4000"
+    env_file:
+      - .env
+    environment:
+      - PORT=4000
+      - DB_HOST=python-db
+      - DB_PORT=5432
+      - DB_USER=${DB_USER}
+      - DB_PASSWORD=${DB_PASSWORD}
+      - DB_NAME=${DB_NAME}
+      - JWT_SECRET=${JWT_SECRET}
+      - NODE_ENV=production
+    depends_on:
+      - python-db
 
   # ===========================
   # Next.js Admin Dashboard
@@ -41,62 +32,40 @@ services:
       context: ./admin-dashboard
       dockerfile: Dockerfile
       args:
-        NEXT_PUBLIC_STRAPI_API_URL: ${NEXT_PUBLIC_STRAPI_API_URL}
+        NEXT_PUBLIC_API_URL: http://backend:4000
     container_name: nextjs-admin
     restart: unless-stopped
-    expose:
-      - "3033"
+    ports:
+      - "3033:3033"
     env_file:
       - .env
     environment:
-      - NEXT_PUBLIC_STRAPI_API_URL=${NEXT_PUBLIC_STRAPI_API_URL}
-      - VIRTUAL_HOST=fbadmin.africasoccer.com
-      - LETSENCRYPT_HOST=fbadmin.africasoccer.com
-      - LETSENCRYPT_EMAIL=jaivinpatel@tricoreitsolutions.com
-      - HTTPS_METHOD=redirect
+      - NEXT_PUBLIC_API_URL=http://backend:4000
     depends_on:
-      - strapi
+      - backend
 
   # ===========================
-  # Python News Engine
+  # Python Scraping Engine
   # ===========================
-  news-engine:
-    build:
-      context: ./news-engine
-      dockerfile: Dockerfile
-    container_name: news-engine
-    restart: unless-stopped
-    expose:
-      - "8000"
-    env_file:
-      - .env
-    environment:
-      - VIRTUAL_HOST=fbpyapi.africasoccer.com
-      - LETSENCRYPT_HOST=fbpyapi.africasoccer.com
-      - LETSENCRYPT_EMAIL=jaivinpatel@tricoreitsolutions.com
-      - HTTPS_METHOD=redirect
-    depends_on:
-      - python-db
-    volumes:
-      - ./news-engine:/app
-
-  # 🕒 Cron scheduler container
   news-engine-cron:
     build:
       context: ./news-engine
       dockerfile: Dockerfile
     container_name: news-engine-cron
-    command: ["python3", "-u", "cron_all.py"]  # -u flag for unbuffered output
+    command: ["python3", "-u", "cron_all.py"]
     restart: unless-stopped
     env_file:
       - .env
     environment:
-      - PYTHONUNBUFFERED=1  # Ensure unbuffered output for logs
+      - PYTHONUNBUFFERED=1
     depends_on:
       - python-db
     volumes:
       - ./news-engine:/app
 
+  # ===========================
+  # PostgreSQL Database (shared)
+  # ===========================
   python-db:
     image: postgres:17
     container_name: python-db

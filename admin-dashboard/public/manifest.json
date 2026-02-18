@@ -1,6 +1,6 @@
 {
-  "name": "FootballNewsApp",
-  "short_name": "FootballNews",
+  "name": "AI News Generator",
+  "short_name": "AI News",
   "display": "standalone",
   "start_url": "/",
   "theme_color": "#000000",

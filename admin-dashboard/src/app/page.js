@@ -18,7 +18,7 @@ export default function HomePage() {
       const returnTo = getRootPath(user?.roles);
       router.push(returnTo);
     }
-  }, [loading]);
+  }, [loading, router, user]);
 
   return loading ? <SplashScreen /> : null;
 }

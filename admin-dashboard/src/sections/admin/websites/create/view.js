@@ -9,9 +9,8 @@ import { BackButton, FormComponent } from 'src/custom';
 
 import { useSettingsContext } from 'src/components/settings';
 /**
- * Renders a form for editing Leagus information.
+ * Renders a form for creating a new website.
  * @param {Object} props - Component props.
- * @param {Object} props.data - Object containing the Website's current information.
  * @param {Function} props.onCreate - Function to be called when the form is submitted.
  * @param {Function} props.onField - Function to handle changes in form fields.
  * @returns {JSX.Element} - Rendered component.

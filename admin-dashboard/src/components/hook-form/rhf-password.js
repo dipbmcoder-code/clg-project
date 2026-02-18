@@ -24,10 +24,8 @@ export default function RHFPasswordField({ control, name, helperText, ...other }
           {...field}
           fullWidth
           type={showPassword ? 'text' : 'password'}
-          value={field.value}
-          onChange={(event) => {
-            field.onChange(event.target.value);
-          }}
+          value={field.value ?? ''}
+          onChange={(event) => field.onChange(event.target.value)}
           error={!!error}
           helperText={error ? error.message : helperText}
           InputProps={{

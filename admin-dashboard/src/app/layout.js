@@ -13,7 +13,6 @@ import { MotionLazy } from 'src/components/animate/motion-lazy';
 import { SettingsDrawer, SettingsProvider } from 'src/components/settings';
 import SnackbarProvider from 'src/components/snackbar/snackbar-provider';
 import { AuthProvider } from 'src/auth/context/jwt';
-import { HydrationOverlay } from '@builder.io/react-hydration-overlay';
 // ----------------------------------------------------------------------
 
 export const viewport = {
@@ -24,7 +23,7 @@ export const viewport = {
 };
 
 export const metadata = {
-  title: 'Football',
+  title: 'AI News Generator',
   manifest: '/manifest.json',
   icons: [
     { rel: 'icon', url: '/favicon/favicon.ico' },
@@ -37,8 +36,7 @@ export const metadata = {
 export default function RootLayout({ children }) {
   return (
     <html lang="en" className={primaryFont.className}>
-      <body>
-        <HydrationOverlay>
+      <body suppressHydrationWarning>
           <AuthProvider>
             <SettingsProvider
               defaultSettings={{
@@ -61,7 +59,6 @@ export default function RootLayout({ children }) {
               </ThemeProvider>
             </SettingsProvider>
           </AuthProvider>
-        </HydrationOverlay>
       </body>
     </html>
   );

@@ -48,18 +48,26 @@ export default function ModernLoginView() {
 
   const onSubmit = handleSubmit(async (data) => {
     try {
-      await new Promise((resolve) => setTimeout(resolve, 500));
       await login?.(data.email, data.password);
     } catch (error) {
       reset();
       
-      setErrorMsg(typeof error === 'string' ? "Something Went Wrong..! Try again later." : error.error.message);
+      // Handle various error shapes from axios interceptor
+      if (typeof error === 'string') {
+        setErrorMsg(error);
+      } else if (error?.error?.message) {
+        setErrorMsg(error.error.message);
+      } else if (error?.message) {
+        setErrorMsg(error.message);
+      } else {
+        setErrorMsg('Something went wrong. Please try again later.');
+      }
     }
   });
 
   const renderHead = (
     <Stack spacing={2} sx={{ mb: 5 }}>
-      <Typography variant="h4">Sign in to Football</Typography>
+      <Typography variant="h4">Sign in to AI News Generator</Typography>
     </Stack>
   );
 
