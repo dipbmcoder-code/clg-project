@@ -1,260 +1,209 @@
+import { HOST_API } from 'src/config-global';
 import { endpoints } from 'src/utils/axios';
-import {
-  upload,
-  fetchAPI,
-  editAction,
-  createAction,
-  deleteAction,
-  deleteAssets,
-} from 'src/utils/helper';
-// Fetch data with given query parameters
-export async function getData({ collection, fixParams, slug, parent, qryParams, filters = [] }) {
-  const params = {
-    ...qryParams,
-    sort: qryParams.sort.map((option) => `${option.field}:${option.sort}`),
-    filters: {
-      $and: [...filters, ...(slug && parent ? [{ [parent]: { id: { $eq: slug } } }] : [])],
-    },
-  };
+import { fetchAPI, editAction, createAction, deleteAction } from 'src/utils/helper';
 
-  const finalParams = { ...params, ...fixParams };
-  const url = endpoints.findMany(collection, finalParams);
-  const res = await fetchAPI(url);
-  return res;
-}
+/**
+ * Build a URL with query parameters for list endpoints.
+ */
+function buildListUrl(baseUrl, qryParams) {
+  const params = new URLSearchParams();
 
-export async function getStatus({ collection, qryParamsData }) {
-  const params = {
-    ...qryParamsData,
-    sort: qryParamsData.sort.map((option) => `${option.field}:${option.sort}`),
-  };
-  const finalParams = { ...params };
-  const url = endpoints.findMany(collection, finalParams);
-  const res = await fetchAPI(url);
-  return res;
-}
+  if (qryParams.page) params.set('page', qryParams.page);
+  if (qryParams.pageSize) params.set('pageSize', qryParams.pageSize);
+  if (qryParams._q) params.set('_q', qryParams._q);
 
-export async function editStatus({ collection, data }) {
-  const decodedData = decodeURIComponent(data);
-  let parsedData = JSON.parse(decodedData);
-    const url = endpoints.findOne(collection, parsedData.id);
-    const stringifyData = JSON.stringify(parsedData);
-    const type = "PUT";
-    const res = await editAction(url, stringifyData, type);
-    return res;
-}
-
-
-export async function getActiveCount({ collection, slug, parent, id }) {
-  const url = endpoints.findMany(collection);
-  const res = await fetchAPI(url);
-  if (!res.error) {
-    return res;
+  // Convert sort array to single string "field:dir"
+  if (qryParams.sort && qryParams.sort.length > 0) {
+    const s = qryParams.sort[0];
+    params.set('sort', `${s.field}:${s.sort}`);
   }
-  return false;
+
+  // Additional filters
+  if (qryParams.news_type) params.set('news_type', qryParams.news_type);
+  if (qryParams.news_status) params.set('news_status', qryParams.news_status);
+  if (qryParams.source) params.set('source', qryParams.source);
+  if (qryParams.is_posted !== undefined) params.set('is_posted', qryParams.is_posted);
+  if (qryParams.active !== undefined) params.set('active', qryParams.active);
+
+  const qs = params.toString();
+  return `${HOST_API}${baseUrl}${qs ? `?${qs}` : ''}`;
 }
-export async function getEntry({ collection, slug, params }) {
-  const url = endpoints.findOne(collection, slug, params);
-  const res = await fetchAPI(url);
-  return res;
-}
-// Generate parameters for field data requests
-const generateFieldParams = (qryParams) => {
-  const { query, id, populate, filters } = qryParams;
-  return {
-    entityId: id,
-    populate,
-    _q: query,
-    pageSize: 50,
-    page: 1,
-    filters,
-  };
+
+// ─── URL Maps ───
+const LIST_URLS = {
+  'users-website': endpoints.websites.list,
+  'news-log': endpoints.logs.list,
+  'social-posts': endpoints.posts.list,
+  'users': endpoints.users.list,
 };
-// Fetch field data with specific parameters
-export async function onField({ collection, qryParams }) {
-  const { field, option, option_val, relation } = qryParams;
-  const finalParams = generateFieldParams(qryParams);
-  const url = endpoints.findMany(
-    relation ? collection : field,
-    finalParams,
-    relation ? field : false
-  );
-  const options = {};
-  try {
-    const res = await fetchAPI(url, options);
-    const fields = res.results.map((item) => ({
-      label: Array.isArray(option)
-        ? option
-            .map((opt) => {
-              if (opt.key.includes('.')) {
-                const keys = opt.key.split('.');
-                let value = item;
-                keys.forEach((key) => {
-                  if (value && value[key]) {
-                    value = value[key];
-                  } else {
-                    value = null;
-                  }
-                });
-                return value;
-              }
-              return item[opt.key] || null; // handle the case when key doesn't exist
-            })
-            .filter((value) => value !== null) // filter out null values
-            .join(' - ')
-        : item[option],
-      value: item[option_val] || item.id,
-    }));
-    return fields;
-  } catch (error) {
-    console.log(error);
-    return error;
+
+const EDIT_URLS = {
+  'users-website': (id) => `${HOST_API}${endpoints.websites.update(id)}`,
+  'news-prompt': () => `${HOST_API}${endpoints.prompts.update}`,
+  'users': (id) => `${HOST_API}${endpoints.users.update(id)}`,
+};
+
+const CREATE_URLS = {
+  'users-website': `${HOST_API}${endpoints.websites.create}`,
+  'users': `${HOST_API}${endpoints.users.create}`,
+};
+
+const DELETE_URLS = {
+  'users-website': (id) => `${HOST_API}${endpoints.websites.delete(id)}`,
+  'users': (id) => `${HOST_API}${endpoints.users.delete(id)}`,
+};
+
+const ENTRY_URLS = {
+  'users-website': (id) => `${HOST_API}${endpoints.websites.get(id)}`,
+  'news-log': (id) => `${HOST_API}${endpoints.logs.get(id)}`,
+  'users': (id) => `${HOST_API}${endpoints.users.get(id)}`,
+};
+
+const SINGLE_TYPE_URLS = {
+  'news-prompt': `${HOST_API}${endpoints.prompts.get}`,
+};
+
+/**
+ * Fetch paginated list data for a collection.
+ */
+export async function getData({ collection, fixParams, qryParams }) {
+  const baseUrl = LIST_URLS[collection];
+  if (!baseUrl) {
+    console.error(`Unknown collection: ${collection}`);
+    return { error: 'Unknown collection' };
   }
+  const url = buildListUrl(baseUrl, qryParams);
+  return await fetchAPI(url);
 }
-// Handle data edit actions
+
+/**
+ * Get all websites (for counting active/inactive).
+ */
+export async function getActiveCount({ collection }) {
+  const url = `${HOST_API}${endpoints.websites.list}?pageSize=100`;
+  return await fetchAPI(url);
+}
+
+/**
+ * Edit (PUT) a record.
+ */
 export async function editData({ collection, data, formData }) {
   const decodedData = decodeURIComponent(data);
   const parsedData = JSON.parse(decodedData);
-  if (parsedData._files) {
-    try {
-      const allRemovedFiles = Object.values(parsedData._files).flat();
-      if (allRemovedFiles.length) {
-        const data = JSON.stringify({ fileIds: allRemovedFiles });
-        const delres = await deleteAssets(data);
-      }
 
-      await Promise.all(
-        Object.keys(parsedData._files).map(async (key) => {
-          let isUpload = false;
-          const uploadData = new FormData();
-          for (const value of formData.getAll(key)) {
-            uploadData.append('files', value);
-            isUpload = true;
-          }
-          if (isUpload) {
-            try {
-              const uploadFile = await upload(uploadData);
-              if (Array.isArray(parsedData[key]) && Array.isArray(uploadFile)) {
-                parsedData[key] = [...parsedData[key], ...uploadFile];
-              } else if (parsedData[key] === null && Array.isArray(uploadFile)) {
-                parsedData[key] = uploadFile[0].id;
-              }
-            } catch (error) {
-              console.error('Error in upload:', error);
-            }
-          }
-        })
-      );
-      const url = endpoints.findOne(collection, parsedData.id);
-      delete parsedData._files;
-      delete parsedData.id;
-      const stringifyData = JSON.stringify(parsedData);
-      const res = await editAction(url, stringifyData);
-      return res;
-    } catch (error) {
-      console.error('Error in editData:', error);
-    }
-  } else {
-    const url = endpoints.findOne(collection, parsedData.id);
-    delete parsedData.id;
-    const stringifyData = JSON.stringify(parsedData);
-    const res = await editAction(url, stringifyData);
-    return res;
+  const urlBuilder = EDIT_URLS[collection];
+  if (!urlBuilder) {
+    console.error(`Unknown collection for edit: ${collection}`);
+    return { error: 'Unknown collection' };
   }
+
+  const url = urlBuilder(parsedData.id);
+
+  // Clean internal fields before sending
+  delete parsedData.id;
+  delete parsedData._files;
+  delete parsedData.documentId;
+  delete parsedData.created_at;
+  delete parsedData.updated_at;
+
+  return await editAction(url, JSON.stringify(parsedData));
 }
-// Handle data creation actions
-export async function createData({ collection, slug, parent, data, formData }) {
+
+/**
+ * Create (POST) a new record.
+ */
+export async function createData({ collection, data, formData }) {
   const decodedData = decodeURIComponent(data);
+  const parsedData = JSON.parse(decodedData);
 
-  try {
-    const parsedData = JSON.parse(decodedData);
-    if (parsedData._files) {
-      try {
-        await Promise.all(
-          Object.keys(parsedData._files).map(async (key) => {
-            let isUpload = false;
-            const uploadData = new FormData();
-            for (const value of formData.getAll(key)) {
-              uploadData.append('files', value);
-              isUpload = true;
-            }
-            if (isUpload) {
-              try {
-                const uploadFile = await upload(uploadData);
-                if (Array.isArray(parsedData[key]) && Array.isArray(uploadFile)) {
-                  parsedData[key] = [...parsedData[key], ...uploadFile];
-                } else if (parsedData[key] === null && Array.isArray(uploadFile)) {
-                  parsedData[key] = uploadFile[0].id;
-                }
-              } catch (error) {
-                console.error('Error in upload:', error);
-              }
-            }
-          })
-        );
-        const url = endpoints.findMany(collection);
-        delete parsedData._files;
-        const stringifyData = JSON.stringify({
-          ...parsedData,
-          ...(slug && parent && { [parent]: { set: [slug] } }),
-        });
-        const res = await createAction(url, stringifyData);
-        return res;
-      } catch (error) {
-        console.error('Error in editData:', error);
-      }
-    } else {
-      const url = endpoints.findMany(collection);
-      const stringifyData = JSON.stringify({
-        ...parsedData,
-        ...(slug && parent && { [parent]: { set: [slug] } }),
-      });
-      const res = await createAction(url, stringifyData);
-      return res;
-    }
-  } catch (error) {
-    return error;
+  const url = CREATE_URLS[collection];
+  if (!url) {
+    console.error(`Unknown collection for create: ${collection}`);
+    return { error: 'Unknown collection' };
   }
+
+  delete parsedData._files;
+  return await createAction(url, JSON.stringify(parsedData));
 }
-// Handle data deletion actions
+
+/**
+ * Delete a record.
+ */
 export async function deleteData({ collection, id }) {
-  try {
-    const url = endpoints.findOne(collection, id);
-    const res = await deleteAction(url);
-    return res;
-  } catch (error) {
-    return error;
+  const urlBuilder = DELETE_URLS[collection];
+  if (!urlBuilder) {
+    console.error(`Unknown collection for delete: ${collection}`);
+    return { error: 'Unknown collection' };
   }
+  return await deleteAction(urlBuilder(id));
 }
-export async function findUsers({ ids, query }) {
-  try {
-    const qryParams = {
-      sort: [{ field: 'id', sort: 'asc' }],
-    };
 
-    if (ids && ids.length) {
-      qryParams.filters = {
-        $and: [{ id: { $in: ids } }],
-      };
-    } else if (query) {
-      qryParams._q = query;
-    } else {
-      qryParams.pageSize = 30;
-      qryParams.page = 1;
-    }
-
-    const url = endpoints.admin.getUsers({ qryParams });
-    const res = await fetchAPI(url);
-
-    if (res.data) {
-      res.data.results = res.data.results.filter(
-        (result) => !result.roles.some((role) => role.id === 1)
-      );
-      return res.data;
-    }
-
-    return res;
-  } catch (error) {
-    return error;
+/**
+ * Fetch a single record by ID.
+ */
+export async function getEntry({ collection, slug }) {
+  const urlBuilder = ENTRY_URLS[collection];
+  if (!urlBuilder) {
+    console.error(`Unknown collection for getEntry: ${collection}`);
+    return { error: 'Unknown collection' };
   }
+  return await fetchAPI(urlBuilder(slug));
+}
+
+/**
+ * Fetch single-type data (e.g., news prompts).
+ */
+export async function getSingleType({ collection }) {
+  const url = SINGLE_TYPE_URLS[collection];
+  if (!url) {
+    console.error(`Unknown single type: ${collection}`);
+    return { error: 'Unknown collection' };
+  }
+  return await fetchAPI(url);
+}
+
+/**
+ * Field options — dynamic lookups for select fields.
+ */
+export async function onField({ collection, qryParams }) {
+  if (collection === 'users' && qryParams?.field === 'roles') {
+    const url = `${HOST_API}${endpoints.users.roles}`;
+    const res = await fetchAPI(url);
+    if (res?.data) {
+      const { option, option_val } = qryParams;
+      return res.data.map((item) => ({
+        label: item[option] || item.name,
+        value: item[option_val] || item.id,
+      }));
+    }
+    return [];
+  }
+  return [];
+}
+
+/**
+ * Find users — for autocomplete and user-select fields.
+ * Accepts { ids, query } and returns { results: [...] }.
+ */
+export async function findUsers({ ids, query } = {}) {
+  const params = new URLSearchParams();
+  params.set('pageSize', '50');
+
+  if (query) {
+    params.set('_q', query);
+  }
+
+  const qs = params.toString();
+  const url = `${HOST_API}${endpoints.users.list}${qs ? `?${qs}` : ''}`;
+  const res = await fetchAPI(url);
+
+  if (res?.error) return { results: [] };
+
+  // If filtering by IDs, filter the results client-side
+  if (ids && ids.length > 0) {
+    const filtered = (res.results || []).filter((u) => ids.includes(u.id) || ids.includes(u.documentId));
+    return { results: filtered };
+  }
+
+  return res;
 }

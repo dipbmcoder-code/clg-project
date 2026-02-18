@@ -184,7 +184,7 @@ export default function CustomAccordionForm({
       // case 'select_country':
       //   return processData(field);
       case 'pre_select':
-        return processPreSelect(field);
+        return processPreSelect(field, dialog);
       // case 'select_league':
       //   return await processLeagues(field);
       case 'file':
@@ -213,14 +213,17 @@ export default function CustomAccordionForm({
     }
   }
 
-  const processPreSelect = (field) => {
+  const processPreSelect = (field, dlg) => {
     const { name, fieldValue, selectType } = field;
     if (fieldValue) {
       return fieldValue;
     }
 
-    const value = dialog?.value[name] ?? '';
-    return fieldValue || (selectType === 'multiple' ? value.split(',') : value);
+    const value = dlg?.value?.[name] ?? '';
+    if (selectType === 'multiple') {
+      return fieldValue || (value ? value.split(',') : []);
+    }
+    return fieldValue || value;
   };
 
   const onSubmit = handleSubmit(async (formData) => {

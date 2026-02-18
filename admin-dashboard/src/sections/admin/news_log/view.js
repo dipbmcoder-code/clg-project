@@ -2,13 +2,10 @@
 
 import { useMemo, useState } from 'react';
 
-import Button from '@mui/material/Button';
 import { alpha } from '@mui/material/styles';
 import {
   Box,
-  Link,
   Stack,
-  Avatar,
   Container,
   Typography,
   IconButton,
@@ -16,17 +13,13 @@ import {
   CardContent,
   Chip,
   Tooltip,
-  Divider
 } from '@mui/material';
-import { BackButton } from 'src/custom';
 import { usePathname } from 'src/routes/hooks';
 import { RouterLink } from 'src/routes/components';
-import { useRouter } from 'src/routes/hooks';
-import { useBoolean } from 'src/hooks/use-boolean';
 
-import { AddIcon, EditIcon, CheckIcon, DeleteIcon, ExclamationIcon } from 'src/utils/icons';
+import { EditIcon } from 'src/utils/icons';
 
-import { DataGridTable, CustomPagination, TransitionsDialog } from 'src/custom/index';
+import { DataGridTable, CustomPagination } from 'src/custom/index';
 import { gridClasses } from '@mui/x-data-grid';
 
 import Label from 'src/components/label';
@@ -34,16 +27,9 @@ import { useSettingsContext } from 'src/components/settings';
 import { fDate, fTime } from 'src/utils/format-time';
 
 function NewsLogs({ data, pageSizeOptions, sorting, onPageChange }) {
-  const router = useRouter();
-  //   const { name, account_number, id } = dealeData;
   const current_path = usePathname();
   const settings = useSettingsContext();
   const [refreshDataGrid, setRefreshDataGrid] = useState(false);
-  const roleColors = {
-    Admin: 'success',
-    Dealer: 'warning',
-    Manager: 'info',
-  };
   const columns = [
     {
       field: 'news_type',
@@ -53,11 +39,11 @@ function NewsLogs({ data, pageSizeOptions, sorting, onPageChange }) {
       renderCell: (params) => {
         const { value } = params;
         const typeColors = {
-          transfer: 'primary',
-          rumour: 'warning',
-          review: 'info',
-          preview: 'secondary',
-          player_abroad: 'success',
+          social_media: 'primary',
+          reddit: 'warning',
+          twitter: 'info',
+          scraping: 'secondary',
+          publishing: 'success',
         };
         return (
           <Chip

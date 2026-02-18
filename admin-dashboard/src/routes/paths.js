@@ -16,21 +16,15 @@ export const paths = {
   // DASHBOARD
   admin_dashboard: {
     root: ROOTS.ADMIN_DASHBOARD,
-    orders: `${ROOTS.ADMIN_DASHBOARD}/orders`,
-    customers: `${ROOTS.ADMIN_DASHBOARD}/customers`,
-
-    users: `${ROOTS.ADMIN_DASHBOARD}/users`,
-    leagues: `${ROOTS.ADMIN_DASHBOARD}/leagues`,
     websites: `${ROOTS.ADMIN_DASHBOARD}/websites`,
+    social_posts: `${ROOTS.ADMIN_DASHBOARD}/social_posts`,
     news_prompts: `${ROOTS.ADMIN_DASHBOARD}/news_prompts`,
-    manual_news: `${ROOTS.ADMIN_DASHBOARD}/manual_news`,
     logs: `${ROOTS.ADMIN_DASHBOARD}/news_logs`,
+    users: `${ROOTS.ADMIN_DASHBOARD}/users`,
   },
   agent_dashboard: {
     root: ROOTS.AGENT_DASHBOARD,
-    orders: `${ROOTS.AGENT_DASHBOARD}/orders`,
   },
-
 };
 
 export const getRootPath = (roles) => {

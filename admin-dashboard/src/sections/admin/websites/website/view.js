@@ -1,19 +1,29 @@
 'use client';
 
-import { useMemo } from 'react';
+import { useMemo, useState, useEffect, useCallback } from 'react';
 import { alpha } from '@mui/material/styles';
-import { Box, Container, Typography, Card, CardContent, Stack, Tooltip, IconButton, Link } from '@mui/material';
+import {
+  Box,
+  Container,
+  Typography,
+  Card,
+  CardContent,
+  Stack,
+  Tooltip,
+  IconButton,
+  Link,
+  Button,
+  CircularProgress,
+  Alert,
+} from '@mui/material';
 
 // Icons
-import TvIcon from '@mui/icons-material/Tv';
 import ShareIcon from '@mui/icons-material/Share';
-import PublicIcon from '@mui/icons-material/Public';
 import SettingsIcon from '@mui/icons-material/Settings';
-import SwapHorizIcon from '@mui/icons-material/SwapHoriz';
-import FactCheckIcon from '@mui/icons-material/FactCheck';
-import EmojiEventsIcon from '@mui/icons-material/EmojiEvents';
-import AccountCircleIcon from '@mui/icons-material/AccountCircle';
+import RedditIcon from '@mui/icons-material/Reddit';
 import HomeIcon from '@mui/icons-material/Home';
+import VerifiedIcon from '@mui/icons-material/Verified';
+import SyncIcon from '@mui/icons-material/Sync';
 
 import { useSettingsContext } from 'src/components/settings';
 import { useRouter, usePathname } from 'src/routes/hooks';
@@ -23,15 +33,7 @@ import {
   CustomAccordionForm,
 } from 'src/custom/index';
 import { useBoolean } from 'src/hooks/use-boolean';
-
-/**
- * Renders a form for editing dealer information.
- * @param {Object} props - Component props.
- * @param {Object} props.data - Object containing the dealer's current information.
- * @param {Function} props.onEdit - Function to be called when the form is submitted.
- * @param {Function} props.onField - Function to handle changes in form fields.
- * @returns {JSX.Element} - Rendered component.
- */
+import axiosInstance, { endpoints } from 'src/utils/axios';
 
 function Website({
   data,
@@ -54,11 +56,18 @@ function Website({
       }
     }
   }
+
   const router = useRouter();
   const pathname = usePathname();
-  const { name, account_number, oem, id, url, offer_page_url_format, banner_setting } = data;
-
   const settings = useSettingsContext();
+
+  // WordPress integration state
+  const [wpCategories, setWpCategories] = useState([]);
+  const [wpAuthors, setWpAuthors] = useState([]);
+  const [wpLoading, setWpLoading] = useState(false);
+  const [wpValidating, setWpValidating] = useState(false);
+  const [wpError, setWpError] = useState('');
+  const [isValidated, setIsValidated] = useState(data?.is_validated || false);
 
   const commonStyle = {
     xs: 12,
@@ -68,15 +77,63 @@ function Website({
   const editDataAction = async (data, formData) => {
     const response = await onEdit(data, formData);
     return response;
-  }
+  };
 
   const viewCategory = useBoolean(false);
 
-  data = useMemo(() => {
-    return {
-      ...data,
-    };
-  }, [data]);
+  // Fetch WP categories & authors if credentials are validated
+  const fetchWPData = useCallback(async () => {
+    if (!data?.id || !data?.is_validated) return;
+
+    setWpLoading(true);
+    setWpError('');
+    try {
+      const [catRes, authRes] = await Promise.all([
+        axiosInstance.get(endpoints.wordpress.categories(data.id)),
+        axiosInstance.get(endpoints.wordpress.authors(data.id)),
+      ]);
+      setWpCategories(
+        (catRes.data?.data || []).map((c) => ({ label: c.name, value: c.id }))
+      );
+      setWpAuthors(
+        (authRes.data?.data || []).map((a) => ({ label: a.name, value: a.id }))
+      );
+    } catch (err) {
+      console.error('Failed to fetch WP data:', err);
+      setWpError('Failed to load WordPress categories/authors');
+    } finally {
+      setWpLoading(false);
+    }
+  }, [data?.id, data?.is_validated]);
+
+  useEffect(() => {
+    fetchWPData();
+  }, [fetchWPData]);
+
+  // Validate WP credentials
+  const handleValidate = async () => {
+    setWpValidating(true);
+    setWpError('');
+    try {
+      const res = await axiosInstance.post(endpoints.wordpress.validate, {
+        website_id: data.id,
+      });
+      if (res.data?.data?.validated) {
+        setIsValidated(true);
+        // Refetch categories & authors after successful validation
+        setTimeout(() => fetchWPData(), 500);
+      }
+    } catch (err) {
+      setIsValidated(false);
+      const msg = err?.error?.message || err?.message || 'Validation failed';
+      setWpError(msg);
+    } finally {
+      setWpValidating(false);
+    }
+  };
+
+  const memoizedData = useMemo(() => ({ ...data }), [data]);
+
   const sections = [
     {
       id: 'general',
@@ -84,220 +141,117 @@ function Website({
       icon: <SettingsIcon sx={{ fontSize: 20 }} />,
       fields: [
         { name: 'platform_name', type: 'string', label: 'Website Name', rules: { required: true } },
-        { name: 'platform_url', type: 'string', label: 'Website Url', rules: { required: true } },
-        { name: 'platform_user', type: 'string', label: 'Admin User', rules: { required: true } },
-        { name: 'platform_password', type: 'password', label: 'Admin Password', rules: { required: true }, helperText: data?.is_validated ? '✅ Validated' : "❌ Wrong credentials" },
+        { name: 'platform_url', type: 'string', label: 'WordPress URL', rules: { required: true }, helperText: 'e.g. https://yoursite.com' },
+        { name: 'platform_user', type: 'string', label: 'WP Username', rules: { required: true }, helperText: 'WordPress admin username' },
+        {
+          name: 'platform_password',
+          type: 'password',
+          label: 'WP Application Password',
+          rules: { required: true },
+          helperText: isValidated
+            ? '✅ Credentials validated — connected to WordPress'
+            : '❌ Not validated — enter an Application Password from WP → Users → Application Passwords',
+        },
         {
           name: 'website_author',
           type: 'free_text_multiple',
           selectType: 'single',
-          label: 'Author',
-          options: data.authorsOptions || []
+          label: 'Default Author',
+          options: wpAuthors.length > 0 ? wpAuthors : (data.authorsOptions || []),
         },
-        { name: 'active', type: 'boolean', label: 'Active/Deactive Website : ', },
-      ],
-    },
-    {
-      id: 'website_leagues',
-      title: 'Leagues',
-      icon: <EmojiEventsIcon sx={{ fontSize: 20 }} />,
-      fields: [
+        { name: 'topic_niche', type: 'string', label: 'Topic / Niche', helperText: 'e.g. Technology, Finance, Sports, Health' },
         {
-          name: 'website_leagues',
-          type: 'select_league',
-          label: 'Leagues',
-          selectType: 'multiple',
-          option: 'league_name',
-          options: data.leagues || [],
-          props: {
-            xs: 12,
-          },
+          name: 'post_status',
+          type: 'select',
+          label: 'Default Post Status',
+          options: [
+            { label: 'Draft', value: 'draft' },
+            { label: 'Publish', value: 'publish' },
+            { label: 'Pending Review', value: 'pending' },
+          ],
+          props: { xs: 6 },
         },
-      ],
-    },
-    {
-      id: 'previews_reviews',
-      title: 'Previews & Reviews',
-      icon: <FactCheckIcon sx={{ fontSize: 20 }} />,
-      fields: [
-        { name: 'enable_match_previews', type: 'boolean', label: 'Enable Match Previews' },
-        { name: 'match_previews_time', type: 'number', label: 'Match Preview Time (in hours)' },
-        { name: 'enable_match_reviews', type: 'boolean', label: 'Enable Match Reviews' },
-        { name: 'match_reviews_time', type: 'number', label: 'Match Review Time After Kickoff (in minutes)' },
-        {
-          name: 'manual_preview_categories',
-          limit: 2,
-          type: 'free_text_multiple', // New type we'll handle
-          label: 'Manual previews categories',
-          options: data.categoriesOptions || [],
-        },
-        {
-          name: 'manual_review_categories',
-          limit: 2,
-          type: 'free_text_multiple', // New type we'll handle
-          label: 'Manual review categories',
-          options: data.categoriesOptions || [],
-        },
+        { name: 'active', type: 'boolean', label: 'Active / Deactivate Website' },
       ],
     },
     {
       id: 'social_media',
-      title: 'Social Media',
+      title: 'Social Media Scraping',
       icon: <ShareIcon sx={{ fontSize: 20 }} />,
       fields: [
         {
-          name: "enable_social_media",
+          name: 'enable_social_media',
           type: 'boolean',
-          label: 'Enable Social Media',
-          props: {
-            xs: 12,
-          },
+          label: 'Enable Social Media Scraping',
+          props: { xs: 12 },
         },
         {
           name: 'twitter_handles',
-          limit: 2,
-          type: 'free_text_multiple', // New type we'll handle
+          limit: 10,
+          type: 'free_text_multiple',
           label: 'X (Twitter) Handles',
-          props: {
-            xs: 6,
-          },
+          props: { xs: 6 },
         },
         {
           name: 'social_media_categories',
-          limit: 2,
-          type: 'free_text_multiple', // New type we'll handle
-          label: 'Social Media Categories',
-          options: data.categoriesOptions || [],
-          props: {
-            xs: 6,
-          },
+          limit: 5,
+          type: 'free_text_multiple',
+          label: 'WordPress Categories',
+          options: wpCategories.length > 0 ? wpCategories : (data.categoriesOptions || []),
+          props: { xs: 6 },
+          helperText: wpCategories.length > 0 ? `${wpCategories.length} categories loaded from WordPress` : 'Validate credentials to load categories',
         },
       ],
     },
     {
-      id: 'player_abroad',
-      title: 'Player Abroad',
-      icon: <PublicIcon sx={{ fontSize: 20 }} />,
+      id: 'reddit',
+      title: 'Reddit Scraping',
+      icon: <RedditIcon sx={{ fontSize: 20 }} />,
       fields: [
-        { name: 'enabled_player_abroad', type: 'boolean', label: 'Enable Player Abroad', props: { xs: 12 } },
-        { name: 'player_abroad_prompt', type: 'string', label: 'Player Abroad Prompt', multiline: true },
         {
-          name: 'player_abroad_categories',
-          limit: 2,
-          type: 'free_text_multiple', // New type we'll handle
-          label: 'Player Abroad Categories',
-          options: data.categoriesOptions || [],
-          props: {
-            xs: 6,
-          },
-        },
-        {
-          name: 'player_abroad_countries',
-          type: 'free_text_multiple',
-          label: 'Countries',
-          selectType: 'multiple',
-          option: 'name',
-          option_val: 'code',
+          name: 'enable_reddit',
+          type: 'boolean',
+          label: 'Enable Reddit Scraping',
           props: { xs: 12 },
         },
-      ]
-    },
-    {
-      id: 'player_profiles',
-      title: 'Player Profiles',
-      icon: <AccountCircleIcon sx={{ fontSize: 20 }} />,
-      fields: [
-        { name: 'enable_player_profiles', type: 'boolean', label: 'Enable Player Profiles', },
         {
-          name: 'player_profiles_categories',
-          limit: 2,
-          type: 'free_text_multiple', // New type we'll handle
-          label: 'Categories',
-          options: data.categoriesOptions || [],
-          props: {
-            xs: 6,
-          },
+          name: 'reddit_subreddits',
+          limit: 10,
+          type: 'free_text_multiple',
+          label: 'Subreddits (without r/)',
+          helperText: 'e.g. technology, worldnews, science',
+          props: { xs: 6 },
         },
         {
-          name: 'player_profiles',
-          type: 'select_profiles',
-          label: 'Leagues',
-          selectType: 'multiple',
-          option: 'league_name',
-          options: data.leagues || [],
-          fields: [
-            { name: 'league', type: 'select', label: 'Select League', options: data.leagues || [] },
-            { name: 'player', type: 'select', label: 'Select Players' },
-            { name: 'datetime', type: 'datetime', label: 'Select Date & Time' },
+          name: 'reddit_mode',
+          type: 'select',
+          label: 'Sort Mode',
+          options: [
+            { label: 'Hot', value: 'hot' },
+            { label: 'New', value: 'new' },
+            { label: 'Top', value: 'top' },
+            { label: 'Rising', value: 'rising' },
           ],
-          props: {
-            xs: 12,
-          },
-        },
-      ]
-    },
-    {
-      id: 'transfer_rumors',
-      title: 'Transfer & Rumors',
-      icon: <SwapHorizIcon sx={{ fontSize: 20 }} />,
-      fields: [
-        { name: 'enable_transfer_rumors', type: 'boolean', label: 'Enable Transfer & Rumors', props: { xs: 12 } },
-        {
-          name: 'transfer_categories',
-          limit: 2,
-          type: 'free_text_multiple', // New type we'll handle
-          label: 'Transfer Categories',
-          options: data.categoriesOptions || [],
-          props: {
-            xs: 6,
-          },
+          props: { xs: 6 },
         },
         {
-          name: 'rumors_categories',
-          limit: 2,
-          type: 'free_text_multiple', // New type we'll handle
-          label: 'Rumors Categories',
-          options: data.categoriesOptions || [],
-          props: {
-            xs: 6,
-          },
-        },
-        {
-          name: 'transfer_rumour_countries',
+          name: 'reddit_categories',
+          limit: 5,
           type: 'free_text_multiple',
-          label: 'Countries',
-          selectType: 'multiple',
-          option: 'name',
-          option_val: 'code',
-          props: { xs: 12 },
+          label: 'WordPress Categories',
+          options: wpCategories.length > 0 ? wpCategories : (data.categoriesOptions || []),
+          props: { xs: 6 },
+          helperText: wpCategories.length > 0 ? `${wpCategories.length} categories loaded` : 'Validate credentials first',
         },
-      ]
+        {
+          name: 'reddit_min_score',
+          type: 'number',
+          label: 'Minimum Score',
+          helperText: 'Only scrape posts with this minimum upvote score',
+          props: { xs: 6 },
+        },
+      ],
     },
-    {
-      id: 'where_to_watch',
-      title: 'Where To Watch',
-      icon: <TvIcon sx={{ fontSize: 20 }} />,
-      fields: [
-        { name: 'enabled_where_to_watch', type: 'boolean', label: 'Enable Where to Watch', props: { xs: 12 } },
-        { name: 'where_to_watch_days', type: 'number', label: 'News Publish Time (Days Before League Start)' },
-        {
-          name: 'where_to_watch_categories',
-          limit: 2,
-          type: 'free_text_multiple', // New type we'll handle
-          label: 'Where to Watch Categories',
-          options: data.categoriesOptions || [],
-        },
-        {
-          name: 'where_to_watch_countries',
-          type: 'free_text_multiple',
-          label: 'Countries',
-          selectType: 'multiple',
-          option: 'name',
-          option_val: 'code',
-          props: { xs: 12 },
-        },
-      ]
-    }
   ];
 
   return (
@@ -308,52 +262,33 @@ function Website({
           <Box
             sx={{
               display: 'flex',
-              alignItems: 'center',
+              alignItems: { xs: 'flex-start', sm: 'center' },
               justifyContent: 'space-between',
+              flexDirection: { xs: 'column', sm: 'row' },
               gap: 2,
               p: 3,
               borderRadius: 2,
               border: (theme) => `1px solid ${alpha(theme.palette.primary.main, 0.2)}`,
             }}
           >
-            <Stack direction="row" alignItems="center" spacing={1.5}>
-
-
-              {/* Breadcrumb Navigation */}
+            <Stack direction="row" alignItems="center" spacing={1.5} sx={{ flexWrap: 'wrap' }}>
               <Box>
-                <Stack direction="row" alignItems="center" spacing={1}>
-                  {/* Home Icon */}
+                <Stack direction="row" alignItems="center" spacing={1} sx={{ flexWrap: 'wrap' }}>
                   <Tooltip title="Go to Dashboard" arrow>
                     <IconButton
                       size="small"
                       onClick={() => router.push('/admin-dashboard')}
-                      sx={{
-                        color: 'primary.main',
-                        '&:hover': {
-                          bgcolor: 'primary.lighter',
-                        },
-                      }}
+                      sx={{ color: 'primary.main', '&:hover': { bgcolor: 'primary.lighter' } }}
                     >
                       <HomeIcon />
                     </IconButton>
                   </Tooltip>
-                  <Typography
-                    variant="h4"
-                    sx={{
-                      fontWeight: 700,
-                      color: 'text.secondary',
-                    }}
-                  >
-                    /
-                  </Typography>
+                  <Typography variant="h4" sx={{ fontWeight: 700, color: 'text.secondary' }}>/</Typography>
                   <Link
                     component={RouterLink}
                     href="/admin-dashboard/websites"
                     underline="hover"
-                    sx={{
-                      cursor: 'pointer',
-                      transition: 'all 0.2s',
-                    }}
+                    sx={{ cursor: 'pointer', transition: 'all 0.2s' }}
                   >
                     <Typography
                       variant="h4"
@@ -363,48 +298,59 @@ function Website({
                         backgroundClip: 'text',
                         WebkitBackgroundClip: 'text',
                         WebkitTextFillColor: 'transparent',
-                        '&:hover': {
-                          opacity: 0.8,
-                        },
+                        '&:hover': { opacity: 0.8 },
                       }}
                     >
                       Websites
                     </Typography>
                   </Link>
-                  <Typography
-                    variant="h4"
-                    sx={{
-                      fontWeight: 700,
-                      color: 'text.secondary',
-                    }}
-                  >
-                    /
-                  </Typography>
-                  <Typography
-                    variant="h4"
-                    sx={{
-                      fontWeight: 700,
-                      color: 'text.primary',
-                    }}
-                  >
+                  <Typography variant="h4" sx={{ fontWeight: 700, color: 'text.secondary' }}>/</Typography>
+                  <Typography variant="h4" sx={{ fontWeight: 700, color: 'text.primary' }}>
                     {data.platform_name}
                   </Typography>
                 </Stack>
-                <Typography
-                  variant="body2"
-                  sx={{
-                    color: 'text.secondary',
-                    fontWeight: 500,
-                    mt: 0.5,
-                  }}
-                >
-                  Configure website settings and integrations
+                <Typography variant="body2" sx={{ color: 'text.secondary', fontWeight: 500, mt: 0.5 }}>
+                  Configure website settings, WordPress integration, and scraping
                 </Typography>
               </Box>
             </Stack>
+
+            {/* Validate Button */}
+            <Button
+              variant={isValidated ? 'outlined' : 'contained'}
+              color={isValidated ? 'success' : 'primary'}
+              startIcon={wpValidating ? <CircularProgress size={18} color="inherit" /> : (isValidated ? <VerifiedIcon /> : <SyncIcon />)}
+              onClick={handleValidate}
+              disabled={wpValidating}
+              sx={{
+                minWidth: 180,
+                fontWeight: 600,
+                flexShrink: 0,
+              }}
+            >
+              {wpValidating ? 'Validating...' : isValidated ? 'Re-validate WP' : 'Validate Credentials'}
+            </Button>
           </Box>
         )}
 
+        {/* WordPress Status Alert */}
+        {wpError && (
+          <Alert severity="error" onClose={() => setWpError('')} sx={{ borderRadius: 2 }}>
+            {wpError}
+          </Alert>
+        )}
+
+        {wpLoading && (
+          <Alert severity="info" icon={<CircularProgress size={18} />} sx={{ borderRadius: 2 }}>
+            Loading WordPress categories and authors...
+          </Alert>
+        )}
+
+        {isValidated && wpCategories.length > 0 && !wpLoading && (
+          <Alert severity="success" sx={{ borderRadius: 2 }}>
+            Connected to WordPress — {wpCategories.length} categories and {wpAuthors.length} authors loaded
+          </Alert>
+        )}
 
         {/* Settings Form Card */}
         <Card
@@ -414,28 +360,24 @@ function Website({
             overflow: 'hidden',
           }}
         >
-          <CardContent sx={{ p: 3 }}>
+          <CardContent sx={{ p: { xs: 2, md: 3 } }}>
             <CustomAccordionForm
               time={time}
-              // excludeSections={excludeSections}
-              selectedOffers={['general', 'leagues']}
+              selectedOffers={['general']}
               sections={sections}
-              // custom_data={!!custom_data}
-              // ignoreDirty={!!ignoreDirty}
-              dialog={data}
+              dialog={memoizedData}
               refresh={true}
               action={editDataAction}
               viewCategory={viewCategory}
               onField={onField}
-              type={"page"}
+              type="page"
               commonStyle={commonStyle}
-            // deleteEntry={deleteEntry}
             />
           </CardContent>
         </Card>
-        {/* <LeaguesCategoryPopup data={data} handle={viewCategory} action={editDataAction} /> */}
       </Stack>
     </Container>
   );
 }
+
 export default Website;

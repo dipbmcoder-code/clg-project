@@ -10,11 +10,12 @@ import { Chip, TextField, Autocomplete } from '@mui/material';
 
 export default function AutoCompleteBox({ control, setValue, field, helperText, onField }) {
   const areEqual = (a, b) => isEqual(a, b);
-  const [allOptions, setAllOptions] = useState(control._defaultValues[field.name]);
+  const safeDefault = Array.isArray(control?._defaultValues?.[field.name]) ? control._defaultValues[field.name] : [];
+  const [allOptions, setAllOptions] = useState(safeDefault);
   const [hasInteracted, setHasInteracted] = useState(false);
   const [searchText, setSearchText] = useState('');
 
-  const initialParent = field.parent?.fieldName ? control._getWatch(field.parent.fieldName) : false;
+  const initialParent = field.parent?.fieldName && typeof control._getWatch === 'function' ? control._getWatch(field.parent.fieldName) : false;
 
   const [parent, setParent] = useState(initialParent);
 
@@ -74,7 +75,10 @@ export default function AutoCompleteBox({ control, setValue, field, helperText, 
         params.populate = field.populate;
       }
       const data = await onField(params);
-      setAllOptions(data);
+      // onField may return either an array or an object like { results: [] }
+      const opts = Array.isArray(data) ? data : data?.results ?? [];
+      // normalize options to { label, value } shape to avoid MUI errors
+      setAllOptions(Array.isArray(opts) ? opts.map(normalizeOption) : []);
     } catch (error) {
       console.error('Failed to fetch options', error);
     }
@@ -98,22 +102,41 @@ export default function AutoCompleteBox({ control, setValue, field, helperText, 
 
   return (
     <Controller
-      render={({ field: { onChange, value }, fieldState: { error } }) => (
-        <Autocomplete
+      render={({ field: { onChange, value }, fieldState: { error } }) => {
+        const normalizedValue = field.selectType === 'multiple'
+          ? (Array.isArray(value) ? value.map(normalizeOption) : [])
+          : (value ? normalizeOption(value) : null);
+
+        return (
+          <Autocomplete
           fullWidth
           clearOnEscape
           filterSelectedOptions
-          multiple
+          multiple={field.selectType === 'multiple'}
           options={allOptions}
-          value={value}
-          getOptionLabel={(option) => option.label ?? option}
-          isOptionEqualToValue={(option, val) => option.value === val.value}
+          value={normalizedValue}
+          getOptionLabel={(option) => {
+            if (Array.isArray(option)) return option.map(o => o.label ?? String(o)).join(', ');
+            if (option == null) return '';
+            return String(option.label ?? option.value ?? option.name ?? option);
+          }}
+          isOptionEqualToValue={(option, val) => {
+            const optVal = option?.value ?? option?.code ?? option?.name ?? option;
+            const valVal = val?.value ?? val?.code ?? val?.name ?? val;
+            return String(optVal) === String(valVal);
+          }}
           onChange={(event, d) => {
-            const newValue = field.selectType == 'multiple' ? d : Array.from(d).slice(-1);
+            let newValue;
+            if (field.selectType === 'multiple') {
+              newValue = Array.isArray(d) ? d.map(normalizeOption) : [];
+            } else {
+              const first = Array.isArray(d) ? d[0] ?? null : d ?? null;
+              newValue = first ? normalizeOption(first) : null;
+            }
             onChange(newValue);
           }}
           renderOption={(props, option) => (
-            <li {...props} key={option.label}>
+            <li {...props} key={option.value ?? option.label}>
               {option.label}
             </li>
           )}
@@ -126,7 +149,7 @@ export default function AutoCompleteBox({ control, setValue, field, helperText, 
                 size="small"
                 variant="soft"
                 label={option.label}
-                key={option.label}
+                key={option.value ?? option.label ?? index}
               />
             ))
           }
@@ -139,7 +162,8 @@ export default function AutoCompleteBox({ control, setValue, field, helperText, 
             />
           )}
         />
-      )}
+        );
+      }}
       onChange={([event, data]) => data}
       name={field.name}
       control={control}
@@ -152,3 +176,16 @@ AutoCompleteBox.propTypes = {
   field: PropTypes.object.isRequired,
   onField: PropTypes.func.isRequired,
 };
+
+function normalizeOption(item) {
+  if (item == null) return { label: '', value: '' };
+  if (typeof item === 'string' || typeof item === 'number') {
+    return { label: String(item), value: String(item) };
+  }
+  if (typeof item === 'object') {
+    const label = item.label ?? item.name ?? item.label ?? String(item);
+    const value = item.value ?? item.code ?? item.id ?? item.name ?? JSON.stringify(item);
+    return { label: String(label), value: String(value) };
+  }
+  return { label: String(item), value: String(item) };
+}

@@ -4,7 +4,18 @@ import { useMemo, useState } from 'react';
 
 import Button from '@mui/material/Button';
 import { alpha } from '@mui/material/styles';
-import { Box, Link, Stack, Avatar, Container, Typography, IconButton } from '@mui/material';
+import {
+  Box,
+  Link,
+  Stack,
+  Avatar,
+  Container,
+  Typography,
+  IconButton,
+  Card,
+  CardContent,
+  Tooltip,
+} from '@mui/material';
 
 import { usePathname } from 'src/routes/hooks';
 import { RouterLink } from 'src/routes/components';
@@ -22,28 +33,36 @@ function Users({ data, pageSizeOptions, sorting, onPageChange, onDelete }) {
   const current_path = usePathname();
   const settings = useSettingsContext();
   const [refreshDataGrid, setRefreshDataGrid] = useState(false);
+
   const roleColors = {
-    Admin: 'success',
+    'Admin': 'success',
+    'Super Admin': 'primary',
+    'Editor': 'info',
   };
+
   const columns = [
     {
       field: 'firstname',
-      // flex: 1,
       headerName: 'First Name',
-
+      minWidth: 160,
       filterable: false,
       renderCell: (params) => {
-        const { value, row } = params;
-        const { thumbnail } = row;
-        const thumb_url = thumbnail?.formats?.thumbnail?.url
-          ? thumbnail?.formats?.thumbnail?.url
-          : thumbnail?.url;
+        const { value } = params;
         return (
           <Stack spacing={2} direction="row" alignItems="center" height="100%">
-            <Avatar alt={value} sx={{ width: 36, height: 36 }} src={thumbnail && thumb_url}>
-              {!thumbnail && value.charAt(0).toUpperCase()}
+            <Avatar
+              alt={value}
+              sx={{
+                width: 36,
+                height: 36,
+                bgcolor: 'primary.main',
+                fontWeight: 700,
+                fontSize: '0.9rem',
+              }}
+            >
+              {value ? value.charAt(0).toUpperCase() : '?'}
             </Avatar>
-            <Typography component="span" variant="body2" noWrap>
+            <Typography component="span" variant="body2" noWrap sx={{ fontWeight: 500 }}>
               {value}
             </Typography>
           </Stack>
@@ -52,38 +71,31 @@ function Users({ data, pageSizeOptions, sorting, onPageChange, onDelete }) {
     },
     {
       field: 'lastname',
-      // flex: 1,
       headerName: 'Last Name',
-
+      minWidth: 140,
       filterable: false,
-
-      renderCell: (params) => {
-        const { value } = params;
-        return (
-          <Typography component="span" variant="body2" noWrap>
-            {value}
-          </Typography>
-        );
-      },
+      renderCell: (params) => (
+        <Typography component="span" variant="body2" noWrap>
+          {params.value}
+        </Typography>
+      ),
     },
     {
       field: 'email',
       flex: 1,
       headerName: 'Email',
+      minWidth: 200,
       filterable: false,
-      renderCell: (params) => {
-        const { value } = params;
-        return (
-          <Typography component="span" variant="body2" noWrap>
-            {value}
-          </Typography>
-        );
-      },
+      renderCell: (params) => (
+        <Typography component="span" variant="body2" noWrap sx={{ color: 'primary.main' }}>
+          {params.value}
+        </Typography>
+      ),
     },
     {
       field: 'roles',
-      // flex: 1,
-      headerName: 'Roles',
+      headerName: 'Role',
+      width: 130,
       align: 'center',
       headerAlign: 'center',
       filterable: false,
@@ -91,15 +103,7 @@ function Users({ data, pageSizeOptions, sorting, onPageChange, onDelete }) {
       renderCell: (params) => {
         const { value } = params;
         return (
-          <Box
-            sx={{
-              display: 'flex',
-              height: '100%',
-              gap: 1,
-              justifyContent: 'center',
-              alignItems: 'center',
-            }}
-          >
+          <Box sx={{ display: 'flex', height: '100%', gap: 1, justifyContent: 'center', alignItems: 'center' }}>
             {value && value.length > 0 ? (
               value.map((role, index) => (
                 <Label key={index} color={roleColors[role.name] || 'default'} variant="soft">
@@ -107,84 +111,71 @@ function Users({ data, pageSizeOptions, sorting, onPageChange, onDelete }) {
                 </Label>
               ))
             ) : (
-              <Label>No Roles</Label>
+              <Label>No Role</Label>
             )}
           </Box>
         );
       },
     },
     {
-      field: 'blocked',
-      // flex: 1,
-      headerName: 'Blocked',
-      align: 'center',
-      headerAlign: 'center',
-      filterable: false,
-      sortable: false,
-
-      renderCell: (params) => (
-        <Stack direction="row" alignItems="center" justifyContent="center" height="100%">
-          {params.value ? (
-            <CheckIcon sx={{ color: 'primary.main' }} />
-          ) : (
-            <ExclamationIcon sx={{ color: 'warning.main' }} />
-          )}
-        </Stack>
-      ),
-    },
-    {
       field: 'isActive',
-      flex: 1,
       headerName: 'Active',
+      width: 100,
       align: 'center',
       headerAlign: 'center',
       sortable: false,
-      sortable: false,
-
+      filterable: false,
       renderCell: (params) => (
         <Stack direction="row" alignItems="center" justifyContent="center" height="100%">
-          {params.value ? (
-            <CheckIcon sx={{ color: 'primary.main' }} />
-          ) : (
-            <ExclamationIcon sx={{ color: 'warning.main' }} />
-          )}
+          <Label color={params.value ? 'success' : 'warning'} variant="soft">
+            {params.value ? 'Active' : 'Inactive'}
+          </Label>
         </Stack>
       ),
     },
     {
       type: 'actions',
       field: 'actions',
-      flex: 1,
       headerName: 'Actions',
-      maxWidth: 100,
+      width: 120,
       align: 'center',
       headerAlign: 'center',
       sortable: false,
       filterable: false,
       disableColumnMenu: true,
       getActions: ({ row }) => [
-        <Link component={RouterLink} underline="none" href={`${current_path}/${row.id}`}>
-          <EditIcon />
-        </Link>,
-        <IconButton
-          color="error"
-          onClick={(e) => {
-            e.stopPropagation();
-            deleteEntry(row.id);
-          }}
-          label="Delete"
-        >
-          <DeleteIcon />
-        </IconButton>,
+        <Tooltip title="Edit User" arrow key="edit">
+          <IconButton
+            component={RouterLink}
+            href={`${current_path}/${row.id}`}
+            size="small"
+            sx={{ color: 'primary.main', '&:hover': { bgcolor: 'primary.lighter' } }}
+          >
+            <EditIcon />
+          </IconButton>
+        </Tooltip>,
+        <Tooltip title="Delete User" arrow key="delete">
+          <IconButton
+            size="small"
+            onClick={(e) => {
+              e.stopPropagation();
+              deleteEntry(row.id);
+            }}
+            sx={{ color: 'error.main', '&:hover': { bgcolor: 'error.lighter' } }}
+          >
+            <DeleteIcon />
+          </IconButton>
+        </Tooltip>,
       ],
     },
   ];
-  const autoSizeColumns = ['firstname', 'lastname', 'roles'];
+
   const deleteDialog = useBoolean();
 
   const deleteEntry = (id) => {
     deleteDialog.setValue(id);
   };
+
   const handleRefreshDataGrid = () => {
     setRefreshDataGrid((prev) => !prev);
   };
@@ -192,7 +183,6 @@ function Users({ data, pageSizeOptions, sorting, onPageChange, onDelete }) {
   const memoizedDataGridTable = useMemo(
     () => (
       <DataGridTable
-        autoSizeColumns={autoSizeColumns}
         data={data}
         columns={columns}
         refresh={refreshDataGrid}
@@ -200,6 +190,32 @@ function Users({ data, pageSizeOptions, sorting, onPageChange, onDelete }) {
         fetchData={onPageChange}
         pageSizeOptions={pageSizeOptions}
         CustomPaginationComponent={CustomPagination}
+        sx={{
+          border: 'none',
+          '& .MuiDataGrid-cell': {
+            py: 2,
+            borderColor: (theme) => alpha(theme.palette.divider, 0.5),
+          },
+          '& .MuiDataGrid-columnHeaders': {
+            bgcolor: (theme) => alpha(theme.palette.grey[500], 0.08),
+            borderRadius: 0,
+            borderBottom: (theme) => `2px solid ${theme.palette.divider}`,
+          },
+          '& .MuiDataGrid-columnHeader': {
+            fontWeight: 700,
+            fontSize: '0.875rem',
+            color: 'text.primary',
+          },
+          '& .MuiDataGrid-row': {
+            '&:hover': {
+              bgcolor: (theme) => alpha(theme.palette.primary.main, 0.04),
+            },
+          },
+          '& .MuiDataGrid-footerContainer': {
+            borderTop: (theme) => `2px solid ${theme.palette.divider}`,
+            bgcolor: (theme) => alpha(theme.palette.grey[500], 0.04),
+          },
+        }}
       />
     ),
     [data, sorting, onPageChange, refreshDataGrid]
@@ -212,7 +228,7 @@ function Users({ data, pageSizeOptions, sorting, onPageChange, onDelete }) {
         refresh={handleRefreshDataGrid}
         action={onDelete}
         title="Delete User"
-        content="Are you sure you want to delete?"
+        content="Are you sure you want to delete this user?"
         buttonText="Delete"
         props={{
           variant: 'soft',
@@ -221,42 +237,63 @@ function Users({ data, pageSizeOptions, sorting, onPageChange, onDelete }) {
         }}
       />
       <Container maxWidth={settings.themeStretch ? false : 'xl'}>
-        <Typography variant="h4"> Users </Typography>
-        <Box
-          sx={{
-            mt: 5,
-            width: 1,
-            borderRadius: 2,
-            bgcolor: (theme) => alpha(theme.palette.grey[500], 0.04),
-            border: (theme) => `dashed 1px ${theme.palette.divider}`,
-          }}
-        >
+        <Stack spacing={3}>
+          {/* Header */}
           <Box
-            component="div"
             sx={{
-              mt: 2,
               display: 'flex',
+              alignItems: { xs: 'flex-start', sm: 'center' },
+              justifyContent: 'space-between',
+              flexDirection: { xs: 'column', sm: 'row' },
               gap: 2,
-              justifyContent: 'end',
-              px: 2,
+              p: 3,
+              borderRadius: 2,
+              border: (theme) => `1px solid ${alpha(theme.palette.primary.main, 0.2)}`,
             }}
           >
+            <Box>
+              <Typography
+                variant="h4"
+                sx={{
+                  fontWeight: 700,
+                  background: (theme) => `linear-gradient(135deg, ${theme.palette.primary.main} 0%, ${theme.palette.primary.dark} 100%)`,
+                  backgroundClip: 'text',
+                  WebkitBackgroundClip: 'text',
+                  WebkitTextFillColor: 'transparent',
+                  mb: 0.5,
+                }}
+              >
+                Users
+              </Typography>
+              <Typography variant="body2" sx={{ color: 'text.secondary', fontWeight: 500 }}>
+                Manage team members and their access roles
+              </Typography>
+            </Box>
             <Link component={RouterLink} underline="none" href={`${current_path}/create`}>
               <Button
-                aria-label="Create"
                 variant="contained"
                 color="primary"
                 startIcon={<AddIcon />}
-                sx={{
-                  alignItems: 'center',
-                }}
+                sx={{ px: 3, py: 1.5, fontWeight: 600, boxShadow: (theme) => theme.customShadows.primary }}
               >
                 Add User
               </Button>
             </Link>
           </Box>
-          {memoizedDataGridTable}
-        </Box>
+
+          {/* Data Grid */}
+          <Card
+            sx={{
+              boxShadow: (theme) => theme.customShadows.card,
+              borderRadius: 2,
+              overflow: 'hidden',
+            }}
+          >
+            <CardContent sx={{ p: 0 }}>
+              {memoizedDataGridTable}
+            </CardContent>
+          </Card>
+        </Stack>
       </Container>
     </>
   );

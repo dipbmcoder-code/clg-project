@@ -17,7 +17,7 @@ import { useRouter } from 'src/routes/hooks';
 
 import useCustomSnackbar from 'src/hooks/use-custom-snackbar';
 
-import { AutoCompleteBox, AutoSelectCountry, AutoSelectLeagues, AutoSelectProfiles, FreeTextMultipleInput } from 'src/custom';
+import { AutoCompleteBox, AutoSelectCountry, FreeTextMultipleInput } from 'src/custom';
 
 import { Edit as EditIcon } from '@mui/icons-material';
 import { RHFContactField, RHFPasswordField, RHFPromptField, RHFSwitch, RHFTextField } from 'src/components/hook-form';
@@ -210,14 +210,6 @@ export default function CustomFormComponent({
         return (
           <AutoSelectCountry control={control} setValue={setValue} field={field} />
         );
-      case 'select_league':
-        return (
-          <AutoSelectLeagues categoriesOptions={dialog.categoriesOptions} control={control} setValue={setValue} field={field} />
-        )
-      case 'select_profiles':
-        return (
-          <AutoSelectProfiles control={control} setValue={setValue} field={field} />
-        )
       case 'free_text_multiple':
         return (
           <FreeTextMultipleInput

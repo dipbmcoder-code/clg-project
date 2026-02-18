@@ -1,5 +1,3 @@
-import { fetchAPI } from 'src/utils/helper';
-import { endpoints } from 'src/utils/axios';
 import { getData, deleteData, getActiveCount, editData } from 'src/utils/commonActions';
 
 import { ServerError } from 'src/custom';
@@ -8,9 +6,8 @@ import Websites from 'src/sections/admin/websites/view';
 // ----------------------------------------------------------------------
 
 export const metadata = {
-  title: 'Users Website',
+  title: 'Websites | AI News Generator',
 };
-const fixParams = {};
 
 const collection = 'users-website';
 const pageSizeOptions = [10, 20, 50, 100];
@@ -19,6 +16,7 @@ const initParams = {
   pageSize: pageSizeOptions[3],
   page: 1,
 };
+
 export default async function Page() {
   try {
     const data = await getDataAction(initParams);
@@ -39,51 +37,32 @@ export default async function Page() {
           onCount={getCount}
           onPageChange={getDataAction}
           onDelete={deleteDataAction}
-          onPublish={onPublish}
           onActive={onActive}
         />
       );
     }
     return <ServerError error={data.error} />;
   } catch (error) {
-    console.log(error);
+    console.error(error);
     return <ServerError />;
   }
 }
 
 async function getCount() {
   'use server';
-
   const res = await getActiveCount({ collection });
   return res;
 }
 
-  async function getDataAction(qryParams) {
-    'use server';
-
-    const res = await getData({ collection, fixParams, qryParams });
-    return res;
-  }
-
-  async function deleteDataAction(id) {
-    'use server';
-
-    return await deleteData({ collection, id });
-  }
-async function onPublish(itemId, action) {
+async function getDataAction(qryParams) {
   'use server';
+  const res = await getData({ collection, fixParams: {}, qryParams });
+  return res;
+}
 
-  const url = endpoints.findAction(collection, itemId, action);
-  try {
-    const fixOptions = {
-      method: 'POST',
-    };
-
-    const postResponse = await fetchAPI(url, fixOptions);
-    return postResponse;
-  } catch (error) {
-    return error;
-  }
+async function deleteDataAction(id) {
+  'use server';
+  return await deleteData({ collection, id });
 }
 
 async function onActive(data, formData) {

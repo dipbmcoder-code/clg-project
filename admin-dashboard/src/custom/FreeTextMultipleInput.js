@@ -50,18 +50,18 @@ export default function FreeTextMultipleInput({
           <Autocomplete
             multiple
             freeSolo
-            options={field?.option_val == 'code' ? allOptions : options}
             filterSelectedOptions
-            value={value || []}
+            options={(field?.option_val == 'code' ? allOptions : options).map(normalizeItem)}
+            value={Array.isArray(value) ? value.map(normalizeItem) : []}
             onOpen={() => setHasInteracted(true)}
             onChange={(_, newValue) => {
-              const currentValue = field.selectType == 'single' ? Array.from(newValue).slice(-1) : newValue;
+              const normalized = Array.isArray(newValue) ? newValue.map(normalizeItem) : [];
+              const currentValue = field.selectType == 'single' ? normalized.slice(-1) : normalized;
               onChange(currentValue);
             }}
-            getOptionKey={(option) => option.id || option.code || option}
-            getOptionLabel={(option) => option.name ?? option}
+            getOptionLabel={(option) => option?.label ?? option?.name ?? String(option)}
             onInputChange={(_, val) => debouncedSearchText(val)}
-            isOptionEqualToValue={(option, value) => option.name === value.name}
+            isOptionEqualToValue={(option, val) => (option?.value ?? option?.code ?? option?.name) === (val?.value ?? val?.code ?? val?.name)}
             renderTags={(tagValue, getTagProps) => {
               const reversed = [...tagValue].reverse();
               const visible = showAll ? reversed : reversed.slice(0, limit);
@@ -69,14 +69,17 @@ export default function FreeTextMultipleInput({
 
               return (
                 <Box sx={{ display: "flex", flexWrap: "wrap", alignItems: "center", gap: 0.5 }}>
-                  {visible.map(option => {
+                  {visible.map((option, idx) => {
                     const originalIndex = tagValue.indexOf(option);
-                    const tagProps = getTagProps({ index: originalIndex });
-                    const { key, ...chipProps } = tagProps;
+                    const tagProps = getTagProps({ index: Math.max(0, originalIndex) });
+                    const { key: _kp, ...chipProps } = tagProps || {};
+                    const chipKey = option?.value ?? option?.code ?? option?.name ?? idx;
                     return (
                       <Chip
-                        key={key}
-                        label={option.name ?? option}
+                        key={chipKey}
+                        label={option?.label ?? option?.name ?? String(option)}
+                        size="small"
+                        variant="outlined"
                         {...chipProps}
                       />
                   )})}
@@ -90,7 +93,7 @@ export default function FreeTextMultipleInput({
                     />
                   )}
 
-                  {showAll && value.length > limit && (
+                  {showAll && Array.isArray(value) && value.length > limit && (
                     <Chip
                       label="Read less"
                       color='primary'
@@ -114,4 +117,18 @@ export default function FreeTextMultipleInput({
       )}
     />
   );
+}
+
+function normalizeItem(item) {
+  if (item == null) return { label: '', value: '' };
+  if (typeof item === 'string' || typeof item === 'number') {
+    return { label: String(item), value: String(item) };
+  }
+  if (typeof item === 'object') {
+    // prefer label/value, then name/code, then fallback to JSON string
+    const label = item.label ?? item.name ?? item.shortName ?? item;
+    const value = item.value ?? item.code ?? item.code3 ?? item.name ?? JSON.stringify(item);
+    return { label: String(label), value: String(value) };
+  }
+  return { label: String(item), value: String(item) };
 }
