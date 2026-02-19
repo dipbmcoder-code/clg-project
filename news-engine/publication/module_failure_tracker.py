@@ -242,12 +242,12 @@ def _disable_module_in_cms(module_type: str):
             return
         
         cms_base_url = os.getenv('CMS_BASE_URL')
-        update_url = f"{cms_base_url}/content-manager/collection-types/api::users-website.users-website"
+        update_url = f"{cms_base_url}/api/websites"
         
         # Update each enabled website
         updated_count = 0
         for website in enabled_websites:
-            website_id = website.get('documentId')
+            website_id = website.get('id')
             if not website_id:
                 continue
             
@@ -293,12 +293,12 @@ def _enable_module_in_cms(module_type: str):
             return
         
         cms_base_url = os.getenv('CMS_BASE_URL')
-        update_url = f"{cms_base_url}/content-manager/collection-types/api::users-website.users-website"
+        update_url = f"{cms_base_url}/api/websites"
         
         # Update each website
         updated_count = 0
         for website in websites:
-            website_id = website.get('documentId')
+            website_id = website.get('id')
             if not website_id:
                 continue
             

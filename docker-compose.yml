@@ -1,29 +1,32 @@
 services:
-  strapi:
+  # ===========================
+  # Node.js Backend (replaces Strapi)
+  # ===========================
+  node-backend:
     build:
-      context: ./cms-strapi
+      context: ./node-backend
       dockerfile: Dockerfile
-    container_name: strapi-app
+    container_name: node-backend
     restart: unless-stopped
     expose:
-      - "1337"
+      - "4000"
     env_file:
       - .env
     environment:
       NODE_ENV: production
-      VIRTUAL_HOST: fbstp.africasoccer.com
-      LETSENCRYPT_HOST: fbstp.africasoccer.com
+      PORT: 4000
+      DATABASE_URL: postgresql://${DATABASE_USERNAME}:${DATABASE_PASSWORD}@backend-db:5432/${DATABASE_NAME}?schema=public
+      VIRTUAL_HOST: api.africasoccer.com
+      LETSENCRYPT_HOST: api.africasoccer.com
       LETSENCRYPT_EMAIL: jaivinpatel@tricoreitsolutions.com
       HTTPS_METHOD: redirect
     depends_on:
-      - db
+      - backend-db
 
-  db:
+  backend-db:
     image: postgres:17
-    container_name: strapi-db
+    container_name: backend-db
     restart: unless-stopped
-    env_file:
-      - .env
     environment:
       POSTGRES_USER: ${DATABASE_USERNAME}
       POSTGRES_PASSWORD: ${DATABASE_PASSWORD}
@@ -41,7 +44,7 @@ services:
       context: ./admin-dashboard
       dockerfile: Dockerfile
       args:
-        NEXT_PUBLIC_STRAPI_API_URL: ${NEXT_PUBLIC_STRAPI_API_URL}
+        NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL}
     container_name: nextjs-admin
     restart: unless-stopped
     expose:
@@ -49,13 +52,13 @@ services:
     env_file:
       - .env
     environment:
-      - NEXT_PUBLIC_STRAPI_API_URL=${NEXT_PUBLIC_STRAPI_API_URL}
+      - NEXT_PUBLIC_API_URL=${NEXT_PUBLIC_API_URL}
       - VIRTUAL_HOST=fbadmin.africasoccer.com
       - LETSENCRYPT_HOST=fbadmin.africasoccer.com
       - LETSENCRYPT_EMAIL=jaivinpatel@tricoreitsolutions.com
       - HTTPS_METHOD=redirect
     depends_on:
-      - strapi
+      - node-backend
 
   # ===========================
   # Python News Engine
@@ -77,11 +80,8 @@ services:
       - HTTPS_METHOD=redirect
     depends_on:
       - python-db
+      - node-backend
     volumes:
-      - ./news-engine:/app
-
-  # 🕒 Cron scheduler container
-  news-engine-cron:
     build:
       context: ./news-engine
       dockerfile: Dockerfile

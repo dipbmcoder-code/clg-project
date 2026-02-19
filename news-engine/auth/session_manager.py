@@ -225,8 +225,8 @@ class SessionManager:
             'Content-Type': 'application/json'
         }
         try:
-            auth_me_url = f"{self.base_url}/admin/users/me"
-            response = requests.get(auth_me_url,headers=headers, params={})
+            auth_me_url = f"{self.base_url}/api/auth/me"
+            response = requests.get(auth_me_url, headers=headers, timeout=15)
             
             if response.status_code == 200:
                 user_data = response.json()
@@ -268,8 +268,8 @@ class SessionManager:
             return False
             
         try:
-            auth_me_url = f"{self.base_url}/admin/users/me"
-            response = self.session.get(auth_me_url)
+            auth_me_url = f"{self.base_url}/api/auth/me"
+            response = self.session.get(auth_me_url, timeout=15)
             
             if response.status_code == 200:
                 user_data = response.json()

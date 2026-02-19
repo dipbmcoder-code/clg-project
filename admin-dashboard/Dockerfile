@@ -11,8 +11,8 @@ RUN npm install --frozen-lockfile
 COPY . .
 
 # Accept build-time environment variables
-ARG NEXT_PUBLIC_STRAPI_API_URL
-ENV NEXT_PUBLIC_STRAPI_API_URL=$NEXT_PUBLIC_STRAPI_API_URL
+ARG NEXT_PUBLIC_API_URL
+ENV NEXT_PUBLIC_API_URL=$NEXT_PUBLIC_API_URL
 
 # Build the Next.js app
 RUN npm run build

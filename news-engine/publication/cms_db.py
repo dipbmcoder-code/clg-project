@@ -20,18 +20,17 @@ def fetch_websites_from_api():
         if not session:
             raise Exception("No authenticated session available")
     
-        cms_website_url = f"{os.getenv('CMS_BASE_URL')}/content-manager/collection-types/api::users-website.users-website"
+        cms_website_url = f"{os.getenv('CMS_BASE_URL')}/api/websites"
         params = {
-            "filters[active][$eq]": "true",
-            "filters[is_validated][$eq]": "true",
-            "populate": "*"
+            "active": "true",
+            "is_validated": "true"
         }
         try:
             response = session.get(cms_website_url, params=params, timeout=30)
             response.raise_for_status()
             print(f"✅ Success!")
             data = response.json()
-            return data.get("results", [])
+            return data.get("data", [])
         except requests.exceptions.RequestException as e:
             print(f"❌ Error fetching users websites: {e}")
             return None
@@ -51,14 +50,13 @@ def fetch_news_prompts():
         if not session:
             return None
 
-        # Content Manager Single Type Endpoint
-        url = f"{os.getenv('CMS_BASE_URL')}/content-manager/single-types/api::news-prompt.news-prompt"
+        # Node.js backend news prompts endpoint
+        url = f"{os.getenv('CMS_BASE_URL')}/api/news-prompts"
         
         response = session.get(url, timeout=10)
         if response.status_code == 200:
             data = response.json()
-            # Strapi Content Manager usually returns the object directly
-            return data
+            return data.get("data", {})
         else:
             print(f"⚠️ Failed to fetch news prompts. Status: {response.status_code}")
             return None

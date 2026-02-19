@@ -30,15 +30,15 @@ function DataGridTable({
 }) {
   const HIDE_COLUMNS_TOGGLABLE = ['edit', 'delete'];
 
-  const [totalRowCount, setTotalRowCount] = useState(data.pagination.total);
+  const [totalRowCount, setTotalRowCount] = useState(data?.pagination?.total ?? 0);
   const [tableState, setTableState] = useState({
-    page: data.pagination.page - 1,
-    pageSize: data.pagination.pageSize,
+    page: (data?.pagination?.page ? data.pagination.page - 1 : 0),
+    pageSize: data?.pagination?.pageSize ?? (pageSizeOptions && pageSizeOptions[0]) ?? 10,
     sort: sorting,
     _q: '',
   });
   const [isFirstRender, setIsFirstRender] = useState(true);
-  const [results, setResults] = useState(data.results);
+  const [results, setResults] = useState(data?.results ?? []);
   const [loading, setLoading] = useState(false);
   const apiRef = useGridApiRef();
 

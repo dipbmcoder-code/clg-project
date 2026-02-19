@@ -213,15 +213,27 @@ def publish(data_j, league_name, team_name_home, team_name_away, featured_image,
             print(f"[INFO]  {site_posted_data}")
             # insert_news_log(types, title, data_j["platform_name"], bool(img_id), 'Published', None, responce['date'])
 
-            # Track successful publication
-            if types:
-                from publication.message_tracker import add_message, MessageStage, MessageStatus
-                add_message(
-                    types,
-                    MessageStage.PUBLICATION,
-                    MessageStatus.SUCCESS,
-                    f"News published successfully to {data_j['platform_name']}"
-                )
+            # Auto-post to social media via Node.js backend
+            try:
+                from auth.session_manager import session_manager
+                sm_session = session_manager.get_authenticated_session()
+                if sm_session:
+                    post_url = responce.get('link', '')
+                    social_payload = {
+                        "websiteId": data_j.get('id'),
+                        "title": title,
+                        "url": post_url,
+                        "imageUrl": featured_image if featured_image else None,
+                        "platforms": ["twitter", "reddit"]
+                    }
+                    sm_api = f"{os.getenv('CMS_BASE_URL')}/api/social-media/post"
+                    sm_resp = sm_session.post(sm_api, json=social_payload, timeout=30)
+                    if sm_resp.status_code == 200:
+                        print(f"[INFO] Social media auto-post triggered for: {title[:50]}")
+                    else:
+                        print(f"[WARN] Social media auto-post returned {sm_resp.status_code}")
+            except Exception as sm_err:
+                print(f"[WARN] Social media auto-post failed (non-blocking): {sm_err}")
 
             return site_posted_data
 

@@ -24,7 +24,8 @@ export const viewport = {
 };
 
 export const metadata = {
-  title: 'Football',
+  title: 'AI News Generator',
+  description: 'AI-powered news generation and publishing platform',
   manifest: '/manifest.json',
   icons: [
     { rel: 'icon', url: '/favicon/favicon.ico' },

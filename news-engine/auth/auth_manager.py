@@ -17,8 +17,8 @@ class AuthManager:
         self._min_auth_interval = 2  # Minimum 2 seconds between auth attempts
         
     def login(self, email=None, password=None, max_retries=3):
-        """Perform login to get CMS token with retry logic and rate limiting"""
-        login_url = f"{self.base_url}/admin/login"
+        """Perform login to get backend token with retry logic and rate limiting"""
+        login_url = f"{self.base_url}/api/auth/login"
         
         # Use provided credentials or fall back to env vars
         login_data = {

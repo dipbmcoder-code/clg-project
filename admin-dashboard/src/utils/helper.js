@@ -112,9 +112,9 @@ export async function deleteAssets(data) {
       method: 'POST',
       body: data,
     };
-    // Make a PUT request using fetchAPI function
-    const putResponse = await fetchAPI(endpoints.assets.actions.bulkDelete, fixOptions);
-    return putResponse;
+    // Bulk delete assets via backend
+    const response = await fetchAPI(`${HOST_API}/api/upload/bulk-delete`, fixOptions);
+    return response;
   } catch (error) {
     return error;
   }

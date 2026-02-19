@@ -1,252 +1,176 @@
-# Football News App
+# AI News Generator
 
-A comprehensive football news platform built with modern web technologies, featuring a Next.js admin dashboard, Strapi CMS backend, and a news engine for content management.
+An AI-powered news generation and publishing platform with automated content creation, image generation, WordPress publishing, and social media distribution.
 
-## 🏗️ Project Architecture
+## Architecture
 
-This project consists of three main components:
+```
++---------------------+     +------------------+     +-----------------+
+|  Admin Dashboard    |---->|  Node.js Backend |---->|  PostgreSQL DB  |
+|  (Next.js 14)       |     |  (Express/Prisma)|     |  (Backend)      |
++---------------------+     +------------------+     +-----------------+
+                                     ^
+                                     |
++---------------------+     +------------------+     +-----------------+
+|  News Engine        |---->|  Python FastAPI   |---->|  PostgreSQL DB  |
+|  (AI Generation)    |     |  (Cron + API)    |     |  (Engine)       |
++---------------------+     +------------------+     +-----------------+
+         |
+         v
+  +--------------+  +----------+  +---------+
+  |  WordPress   |  |  Twitter |  |  Reddit |
+  |  Publishing  |  |  Posts   |  |  Posts  |
+  +--------------+  +----------+  +---------+
+```
 
-### 1. Admin Dashboard (`admin-dashboard/`)
-- **Technology**: Next.js 14 with React 18
-- **UI Framework**: Material-UI (MUI) v5
-- **Styling**: Emotion with custom theme system
-- **Authentication**: JWT-based authentication
-- **Features**: 
-  - Modern admin interface with dashboard layouts
-  - Responsive design with mobile support
-  - Form handling with React Hook Form
-  - Data visualization with charts and grids
-  - Custom animations with Framer Motion
-  - Multi-language support (RTL/LTR)
-  - Theme customization and dark/light modes
+## Components
 
-### 2. CMS Backend (`cms-strapi/`)
-- **Technology**: Strapi v5.17.0
-- **Database**: PostgreSQL
-- **Features**:
-  - Headless CMS for content management
-  - RESTful API endpoints
-  - User permissions and roles
-  - Media management
-  - Content type builder
-  - Admin panel for content editors
+### Node.js Backend (node-backend/)
+Express.js REST API with Prisma ORM replacing the previous Strapi CMS.
 
-### 3. News Engine (`news-engine/`)
-- **Purpose**: Content aggregation and processing system
-- **Features**: Automated news collection and processing
+- **Auth**: JWT-based authentication with role-based access (Super Admin, Admin, Agent)
+- **Websites**: CRUD for WordPress site configurations with connection validation
+- **News Prompts**: AI prompt templates for 8 news types
+- **Manual News**: Create and assign manual articles to websites
+- **News Logs**: Track all generation and publishing activity
+- **AI Settings**: Manage OpenAI, Gemini, OpenRouter API keys and models
+- **Social Media**: Twitter and Reddit auto-posting configuration and execution
+- **WordPress**: Category sync, health checks, recent posts
+- **RapidAPI**: Proxy for sports data (API-Football v3)
 
-## 🚀 Getting Started
+### Admin Dashboard (admin-dashboard/)
+Next.js 14 admin panel with Material UI.
+
+- Website management with WP connection testing
+- News prompt editor for AI content templates
+- Manual news creation workflow
+- AI credentials settings (OpenAI, Gemini, OpenRouter, AWS, SendGrid)
+- Social media configuration (Twitter API, Reddit API per website)
+- WordPress category browser with tree view
+- News generation logs viewer
+- Role-based access control
+
+### News Engine (news-engine/)
+Python FastAPI service for AI content generation and automation.
+
+- AI-powered article generation (OpenAI, OpenRouter)
+- AI image generation (Google Gemini)
+- Web scraping with Selenium
+- Sports data via RapidAPI
+- Automated WordPress publishing
+- Social media auto-posting (Twitter + Reddit) after publish
+- Cron-based scheduling for all news types
+
+## Quick Start
 
 ### Prerequisites
-
-- Node.js 20.x or higher
-- PostgreSQL database
-- npm or yarn package manager
-
-### Installation
-
-1. **Clone the repository**
-   ```bash
-   git clone <repository-url>
-   cd FootballNewsApp
-   ```
-
-2. **Install Admin Dashboard dependencies**
-   ```bash
-   cd admin-dashboard
-   npm install
-   # or
-   yarn install
-   ```
-
-3. **Install CMS Backend dependencies**
-   ```bash
-   cd ../cms-strapi
-   npm install
-   # or
-   yarn install
-   ```
-
-4. **Set up environment variables**
-
-   Create `.env.local` in `admin-dashboard/`:
-   ```env
-   NEXT_PUBLIC_SERVER_URL=http://localhost:1337
-   NEXT_PUBLIC_ASSETS_DIR=http://localhost:1337
-   ```
-
-   Create `.env` in `cms-strapi/`:
-   ```env
-   DATABASE_HOST=localhost
-   DATABASE_PORT=5432
-   DATABASE_NAME=football_news
-   DATABASE_USERNAME=your_username
-   DATABASE_PASSWORD=your_password
-   DATABASE_SSL=false
-   JWT_SECRET=your_jwt_secret
-   ADMIN_JWT_SECRET=your_admin_jwt_secret
-   APP_KEYS=your_app_keys
-   API_TOKEN_SALT=your_api_token_salt
-   TRANSFER_TOKEN_SALT=your_transfer_token_salt
-   ```
-
-### Development
-
-1. **Start the CMS Backend**
-   ```bash
-   cd cms-strapi
-   npm run develop
-   # or
-   yarn develop
-   ```
-   The Strapi admin panel will be available at `http://localhost:1337/admin`
-
-2. **Start the Admin Dashboard**
-   ```bash
-   cd admin-dashboard
-   npm run dev
-   # or
-   yarn dev
-   ```
-   The admin dashboard will be available at `http://localhost:3033`
-
-## 📁 Project Structure
-
-```
-FootballNewsApp/
-├── admin-dashboard/          # Next.js frontend application
-│   ├── src/
-│   │   ├── app/             # Next.js app router pages
-│   │   ├── components/      # Reusable UI components
-│   │   ├── layouts/         # Layout components
-│   │   ├── sections/        # Page sections
-│   │   ├── theme/           # MUI theme configuration
-│   │   ├── utils/           # Utility functions
-│   │   └── routes/          # Routing configuration
-│   ├── public/              # Static assets
-│   └── package.json
-├── cms-strapi/              # Strapi CMS backend
-│   ├── src/
-│   │   ├── api/             # API endpoints
-│   │   ├── admin/           # Admin panel customization
-│   │   └── extensions/      # Strapi extensions
-│   ├── config/              # Strapi configuration
-│   └── package.json
-└── news-engine/             # News aggregation system
-    └── readme.md
-```
-
-## 🎨 Features
-
-### Admin Dashboard
-- **Modern UI**: Clean, professional interface built with Material-UI
-- **Responsive Design**: Works seamlessly on desktop, tablet, and mobile
-- **Authentication**: Secure JWT-based authentication system
-- **Dashboard Analytics**: Data visualization and reporting tools
-- **Content Management**: Interface for managing news articles and media
-- **User Management**: Admin tools for user roles and permissions
-- **Theme System**: Customizable themes with dark/light mode support
-- **Form Handling**: Advanced forms with validation using React Hook Form
-- **Animations**: Smooth animations powered by Framer Motion
-
-### CMS Backend
-- **Content Types**: Flexible content type builder
-- **Media Management**: File upload and management system
-- **API Endpoints**: RESTful API for frontend consumption
-- **User Permissions**: Role-based access control
-- **Admin Panel**: Intuitive content management interface
-- **Database**: PostgreSQL for reliable data storage
-
-## 🛠️ Development Scripts
-
-### Admin Dashboard
-```bash
-npm run dev          # Start development server
-npm run build        # Build for production
-npm run start        # Start production server
-npm run lint         # Run ESLint
-npm run lint:fix     # Fix ESLint issues
-npm run fm:fix       # Format code with Prettier
-# or using yarn
-yarn dev             # Start development server
-yarn build           # Build for production
-yarn start           # Start production server
-yarn lint            # Run ESLint
-yarn lint:fix        # Fix ESLint issues
-yarn fm:fix          # Format code with Prettier
-```
-
-### CMS Backend
-```bash
-npm run develop      # Start development server
-npm run build        # Build for production
-npm run start        # Start production server
-npm run strapi       # Run Strapi CLI commands
-# or using yarn
-yarn develop         # Start development server
-yarn build           # Build for production
-yarn start           # Start production server
-yarn strapi          # Run Strapi CLI commands
-```
-
-## 🔧 Configuration
+- Docker and Docker Compose
+- Node.js 20+ (for local development)
+- Python 3.11+ (for local development)
 
 ### Environment Variables
 
-The application uses environment variables for configuration. See the installation section for required variables.
+Create a .env file in the project root:
 
-### Database Setup
+```
+# Backend Database
+DATABASE_USERNAME=postgres
+DATABASE_PASSWORD=your_password
+DATABASE_NAME=ainews_backend
+POSTGRES_DATA_PATH=./data/backend-db
 
-1. Create a PostgreSQL database
-2. Update the database configuration in `cms-strapi/config/database.js`
-3. Run database migrations: `npm run strapi database:migrate` or `yarn strapi database:migrate`
+# Node.js Backend
+JWT_SECRET=your-jwt-secret-key
+JWT_EXPIRES_IN=7d
+PASSWORD_SECRET_KEY=your-aes-encryption-key
+CORS_ORIGIN=http://localhost:3033
 
-### Content Types
+# Admin Dashboard
+NEXT_PUBLIC_API_URL=http://node-backend:4000
 
-After starting Strapi, you can create content types through the admin panel or by defining them in the `src/api/` directory.
+# Python Engine Database
+DB_USER=postgres
+DB_PASSWORD=your_password
+DB_NAME=ainews_engine
+PYTHON_DB_DATA_PATH=./data/python-db
 
-## 🚀 Deployment
-
-### Production Build
-
-1. **Build Admin Dashboard**
-   ```bash
-   cd admin-dashboard
-   npm run build
-   # or
-   yarn build
-   ```
-
-2. **Build CMS Backend**
-   ```bash
-   cd cms-strapi
-   npm run build
-   # or
-   yarn build
-   ```
-
-3. **Deploy to your preferred hosting platform**
+# Python Engine
+CMS_BASE_URL=http://node-backend:4000
+CMS_ADMIN_USER_EMAIL=admin@ainews.com
+CMS_ADMIN_USER_PASSWORD=admin123456
+```
 
 ### Docker Deployment
 
-Docker configurations can be added for containerized deployment.
+```bash
+# Start all services
+docker-compose up -d
 
-## 🤝 Contributing
+# With nginx-proxy (production)
+docker-compose -f docker-compose.proxy.yml -f docker-compose.yml up -d
 
-1. Fork the repository
-2. Create a feature branch
-3. Make your changes
-4. Add tests if applicable
-5. Submit a pull request
+# View logs
+docker-compose logs -f node-backend
+docker-compose logs -f admin-dashboard
+docker-compose logs -f news-engine
+```
 
-## 📝 License
+### Local Development
 
-This project is licensed under the MIT License.
+#### Node.js Backend
+```bash
+cd node-backend
+npm install
+cp .env.example .env
+npx prisma migrate dev
+npx prisma db seed
+npm run dev
+```
 
-## 🆘 Support
+#### Admin Dashboard
+```bash
+cd admin-dashboard
+npm install
+npm run dev
+```
 
-For support and questions, please open an issue in the repository.
+#### News Engine
+```bash
+cd news-engine
+pip install -r requirements.txt
+uvicorn main:app --reload --port 8000
+```
 
----
+## API Endpoints
 
-**Built with ❤️ using Next.js, Strapi, and Material-UI**
+### Auth
+- POST /api/auth/login - Login with email/password
+- GET /api/auth/me - Get current user
+- POST /api/auth/register - Register new user (admin only)
+
+### Websites
+- GET /api/websites - List all websites
+- POST /api/websites - Create website
+- PUT /api/websites/:id - Update website
+- DELETE /api/websites/:id - Delete website
+- POST /api/websites/:id/validate - Test WordPress connection
+
+### AI Settings
+- GET /api/ai-settings - Get settings (keys masked)
+- PUT /api/ai-settings - Update settings
+- POST /api/ai-settings/test - Test AI provider connection
+
+### Social Media
+- GET /api/social-media/config/:websiteId - Get social config
+- PUT /api/social-media/config/:websiteId - Update social config
+- POST /api/social-media/post - Post to Twitter/Reddit
+- GET /api/social-media/posts - List all social posts
+
+### WordPress
+- GET /api/wordpress/categories/:websiteId - Get cached categories
+- POST /api/wordpress/sync-categories/:websiteId - Sync from WordPress
+- GET /api/wordpress/health/:websiteId - Check WP connection
+
+## License
+
+Private - All rights reserved.

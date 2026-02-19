@@ -39,6 +39,15 @@ const reducer = (state, action) => {
 
 const STORAGE_KEY = 'accessToken';
 
+// Map backend role enum to display name expected by RoleBasedGuard
+const ROLE_DISPLAY_MAP = {
+  SUPER_ADMIN: 'Super Admin',
+  ADMIN: 'Admin',
+  AGENT: 'Agent',
+};
+
+const normalizeRole = (role) => ROLE_DISPLAY_MAP[role] || role;
+
 export function AuthProvider({ children }) {
   const [state, dispatch] = useReducer(reducer, initialState);
 
@@ -50,13 +59,18 @@ export function AuthProvider({ children }) {
         setSession(token);
         const response = await axios.get(endpoints.auth.me);
         const user = response.data.data;
+
+        // Normalize user for role-based guard compatibility
+        const normalizedUser = {
+          ...user,
+          token,
+          roles: [{ name: normalizeRole(user.role) }],
+        };
+
         dispatch({
           type: 'INITIAL',
           payload: {
-            user: {
-              ...user,
-              token,
-            },
+            user: normalizedUser,
           },
         });
       } else {
@@ -90,19 +104,21 @@ export function AuthProvider({ children }) {
     };
     const response = await axios.post(endpoints.auth.login, data);
 
-    const { token } = response.data.data;
+    const { token, user } = response.data.data;
     setSession(token);
-    const res = await axios.get(endpoints.auth.me);
-    const user = res.data.data;
     setCookie(STORAGE_KEY, token, 3);
+
+    // Normalize user object for role-based guard compatibility
+    const normalizedUser = {
+      ...user,
+      token,
+      roles: [{ name: normalizeRole(user.role) }],
+    };
 
     dispatch({
       type: 'LOGIN',
       payload: {
-        user: {
-          ...user,
-          token,
-        },
+        user: normalizedUser,
       },
     });
   }, []);

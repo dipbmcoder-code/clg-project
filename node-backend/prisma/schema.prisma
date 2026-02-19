@@ -1,0 +1,325 @@
+// Prisma Schema for AI News Generator Backend
+// Replaces Strapi CMS with clean, typed data models
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ─── Admin Users ─────────────────────────────────────────────
+model User {
+  id        Int      @id @default(autoincrement())
+  email     String   @unique
+  password  String
+  firstName String   @map("first_name")
+  lastName  String   @map("last_name")
+  role      Role     @default(AGENT)
+  isActive  Boolean  @default(true) @map("is_active")
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@map("users")
+}
+
+enum Role {
+  SUPER_ADMIN
+  ADMIN
+  AGENT
+}
+
+// ─── WordPress Site Configuration ────────────────────────────
+model Website {
+  id                Int      @id @default(autoincrement())
+  platformName      String   @map("platform_name")
+  platformUrl       String   @map("platform_url")
+  platformUser      String   @map("platform_user")
+  platformPassword  String   @map("platform_password") // AES encrypted
+  websiteAuthor     String?  @map("website_author")
+  active            Boolean  @default(true)
+  isValidated       Boolean  @default(false) @map("is_validated")
+  typeStatus        String   @default("draft") @map("type_status") // publish or draft
+  featuredImage     String   @default("upload") @map("featured_image") // upload or url or fifu
+  language          String   @default("eng") @map("l_version") // eng or ru
+
+  // Module toggles
+  enableMatchReviews    Boolean @default(false) @map("enable_match_reviews")
+  enableMatchPreviews   Boolean @default(false) @map("enable_match_previews")
+  enableSocialMedia     Boolean @default(false) @map("enable_social_media")
+  enablePlayerAbroad    Boolean @default(false) @map("enabled_player_abroad")
+  enablePlayerProfiles  Boolean @default(false) @map("enable_player_profiles")
+  enableTransferRumors  Boolean @default(false) @map("enable_transfer_rumors")
+  enableWhereToWatch    Boolean @default(false) @map("enabled_where_to_watch")
+
+  // Module timing configs
+  matchReviewsTime   Int?    @map("match_reviews_time")
+  matchPreviewsTime  Int?    @map("match_previews_time")
+  whereToWatchDays   Int?    @map("where_to_watch_days")
+
+  // Filtering configs (stored as JSON)
+  websiteLeagues           Json?  @map("website_leagues")
+  platformCountries        Json?  @map("platform_countries")
+  twitterHandles           Json?  @map("twitter_handles")
+  socialMediaCategories    Json?  @map("social_media_categories")
+  playerAbroadCountries    Json?  @map("player_abroad_countries")
+  playerAbroadCategories   Json?  @map("player_abroad_categories")
+  playerProfiles           Json?  @map("player_profiles")
+  playerProfilesCategories Json?  @map("player_profiles_categories")
+  transferCategories       Json?  @map("transfer_categories")
+  rumorsCategories         Json?  @map("rumors_categories")
+  transferRumourCountries  Json?  @map("transfer_rumour_countries")
+  whereToWatchCountries    Json?  @map("where_to_watch_countries")
+  whereToWatchCategories   Json?  @map("where_to_watch_categories")
+  manualPreviewCategories  Json?  @map("manual_preview_categories")
+  manualReviewCategories   Json?  @map("manual_review_categories")
+
+  // Custom prompt override
+  openaiPrompt String? @map("openai_prompt") @db.Text
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  // Relations
+  manualNews       ManualNewsWebsite[]
+  wpCategories     WordPressCategory[]
+  socialMediaConfig SocialMediaConfig?
+  newsLogs         NewsLog[]
+
+  @@map("websites")
+}
+
+// ─── AI Prompt Templates (Single Record) ─────────────────────
+model NewsPrompt {
+  id Int @id @default(autoincrement())
+
+  // Preview prompts
+  previewImagePrompt   String? @map("preview_news_image_prompt") @db.Text
+  previewTitlePrompt   String? @map("preview_news_title_prompt") @db.Text
+  previewContentPrompt String? @map("preview_news_content_prompt") @db.Text
+
+  // Review prompts
+  reviewImagePrompt   String? @map("review_news_image_prompt") @db.Text
+  reviewTitlePrompt   String? @map("review_news_title_prompt") @db.Text
+  reviewContentPrompt String? @map("review_news_content_prompt") @db.Text
+
+  // Social media prompts
+  socialMediaImagePrompt   String? @map("social_media_news_image_prompt") @db.Text
+  socialMediaTitlePrompt   String? @map("social_media_news_title_prompt") @db.Text
+  socialMediaContentPrompt String? @map("social_media_news_content_prompt") @db.Text
+
+  // Player abroad prompts
+  playerAbroadImagePrompt   String? @map("player_abroad_news_image_prompt") @db.Text
+  playerAbroadTitlePrompt   String? @map("player_abroad_news_title_prompt") @db.Text
+  playerAbroadContentPrompt String? @map("player_abroad_news_content_prompt") @db.Text
+
+  // Player profile prompts
+  playerProfileImagePrompt   String? @map("player_profile_news_image_prompt") @db.Text
+  playerProfileTitlePrompt   String? @map("player_profile_news_title_prompt") @db.Text
+  playerProfileContentPrompt String? @map("player_profile_news_content_prompt") @db.Text
+
+  // Transfer prompts
+  transferImagePrompt   String? @map("transfer_news_image_prompt") @db.Text
+  transferTitlePrompt   String? @map("transfer_news_title_prompt") @db.Text
+  transferContentPrompt String? @map("transfer_news_content_prompt") @db.Text
+
+  // Rumor prompts
+  rumorImagePrompt   String? @map("rumor_news_image_prompt") @db.Text
+  rumorTitlePrompt   String? @map("rumor_news_title_prompt") @db.Text
+  rumorContentPrompt String? @map("rumor_news_content_prompt") @db.Text
+
+  // Where to watch prompts
+  whereToWatchImagePrompt   String? @map("where_to_watch_news_image_prompt") @db.Text
+  whereToWatchTitlePrompt   String? @map("where_to_watch_news_title_prompt") @db.Text
+  whereToWatchContentPrompt String? @map("where_to_watch_news_content_prompt") @db.Text
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@map("news_prompts")
+}
+
+// ─── Manual News ─────────────────────────────────────────────
+model ManualNews {
+  id          Int      @id @default(autoincrement())
+  newsType    String   @map("news_type") // match_reviews or match_previews
+  homeTeam    String?  @map("home_team")
+  awayTeam    String?  @map("away_team")
+  homeScore   Int?     @map("home_score")
+  awayScore   Int?     @map("away_score")
+  homePos     Int?     @map("home_pos")
+  awayPos     Int?     @map("away_pos")
+  league      Json?
+  summary     String?  @db.Text
+  goalscorers Json?
+  venue       String?
+  matchDate   DateTime? @map("match_date")
+  playersToWatch Json? @map("players_to_watch")
+
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  // Relations
+  websites    ManualNewsWebsite[]
+  websiteNews WebsiteNews[]
+
+  @@map("manual_news")
+}
+
+// Many-to-many: ManualNews <-> Website
+model ManualNewsWebsite {
+  id          Int        @id @default(autoincrement())
+  manualNewsId Int       @map("manual_news_id")
+  websiteId   Int        @map("website_id")
+  manualNews  ManualNews @relation(fields: [manualNewsId], references: [id], onDelete: Cascade)
+  website     Website    @relation(fields: [websiteId], references: [id], onDelete: Cascade)
+
+  @@unique([manualNewsId, websiteId])
+  @@map("manual_news_websites")
+}
+
+// Generated news per website
+model WebsiteNews {
+  id          Int      @id @default(autoincrement())
+  title       String?
+  content     String?  @db.Text
+  imageUrl    String?  @map("image_url")
+  regenerated Boolean  @default(false)
+
+  manualNewsId Int?      @map("manual_news_id")
+  manualNews   ManualNews? @relation(fields: [manualNewsId], references: [id], onDelete: SetNull)
+
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  @@map("website_news")
+}
+
+// ─── News Publication Log ────────────────────────────────────
+model NewsLog {
+  id             Int      @id @default(autoincrement())
+  newsType       String   @map("news_type") // preview, review, player_abroad, etc.
+  title          String?
+  websiteName    String?  @map("website_name")
+  newsStatus     String   @default("Published") @map("news_status") // Published, Failed, Partial
+  logTime        DateTime @default(now()) @map("log_time")
+  imageGenerated Boolean  @default(false) @map("image_generated")
+  logMessage     Json?    @map("log_message")
+
+  websiteId      Int?     @map("website_id")
+  website        Website? @relation(fields: [websiteId], references: [id], onDelete: SetNull)
+
+  createdAt      DateTime @default(now()) @map("created_at")
+
+  @@map("news_logs")
+}
+
+// ─── AI Provider Settings (single record) ────────────────────
+model AiSettings {
+  id Int @id @default(autoincrement())
+
+  // OpenAI
+  openaiApiKey   String? @map("openai_api_key")
+  openaiModel    String  @default("gpt-4") @map("openai_model")
+
+  // OpenRouter
+  openrouterApiKey String? @map("openrouter_api_key")
+  openrouterModel  String? @map("openrouter_model")
+
+  // Google Gemini
+  geminiApiKey   String? @map("gemini_api_key")
+  geminiModel    String  @default("gemini-pro") @map("gemini_model")
+
+  // Service selection
+  contentService String @default("openai") @map("content_service") // openai, openrouter
+  imageService   String @default("gemini") @map("image_service")   // gemini, openrouter, imagen
+
+  // RapidAPI
+  rapidapiKey    String? @map("rapidapi_key")
+
+  // AWS S3
+  awsAccessKey   String? @map("aws_access_key")
+  awsSecretKey   String? @map("aws_secret_key")
+  awsS3Bucket    String? @map("aws_s3_bucket")
+  awsRegion      String? @map("aws_region")
+
+  // SendGrid
+  sendgridApiKey String? @map("sendgrid_api_key")
+  alertEmail     String? @map("alert_email")
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@map("ai_settings")
+}
+
+// ─── Social Media Configuration (per website) ────────────────
+model SocialMediaConfig {
+  id Int @id @default(autoincrement())
+
+  websiteId Int     @unique @map("website_id")
+  website   Website @relation(fields: [websiteId], references: [id], onDelete: Cascade)
+
+  // Twitter / X
+  twitterEnabled       Boolean @default(false) @map("twitter_enabled")
+  twitterApiKey        String? @map("twitter_api_key")
+  twitterApiSecret     String? @map("twitter_api_secret")
+  twitterAccessToken   String? @map("twitter_access_token")
+  twitterAccessSecret  String? @map("twitter_access_secret")
+  twitterBearerToken   String? @map("twitter_bearer_token")
+
+  // Reddit
+  redditEnabled        Boolean @default(false) @map("reddit_enabled")
+  redditClientId       String? @map("reddit_client_id")
+  redditClientSecret   String? @map("reddit_client_secret")
+  redditUsername        String? @map("reddit_username")
+  redditPassword       String? @map("reddit_password")
+  redditSubreddits     Json?   @map("reddit_subreddits") // array of subreddit names
+
+  // Auto-posting settings
+  autoPostOnPublish    Boolean @default(true) @map("auto_post_on_publish")
+  postTemplate         String? @map("post_template") @db.Text // template with {title}, {url} placeholders
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@map("social_media_configs")
+}
+
+// ─── Cached WordPress Categories ─────────────────────────────
+model WordPressCategory {
+  id         Int     @id @default(autoincrement())
+  wpId       Int     @map("wp_id")
+  name       String
+  slug       String
+  parentId   Int?    @map("parent_id")
+  count      Int     @default(0)
+
+  websiteId  Int     @map("website_id")
+  website    Website @relation(fields: [websiteId], references: [id], onDelete: Cascade)
+
+  syncedAt   DateTime @default(now()) @map("synced_at")
+
+  @@unique([websiteId, wpId])
+  @@map("wordpress_categories")
+}
+
+// ─── Social Media Post Log ───────────────────────────────────
+model SocialMediaPost {
+  id         Int      @id @default(autoincrement())
+  platform   String   // twitter, reddit
+  postId     String?  @map("post_id") // platform-specific ID
+  postUrl    String?  @map("post_url")
+  title      String?
+  content    String?  @db.Text
+  articleUrl String?  @map("article_url")
+  status     String   @default("pending") // pending, posted, failed
+  error      String?  @db.Text
+  websiteId  Int?     @map("website_id")
+
+  createdAt  DateTime @default(now()) @map("created_at")
+
+  @@map("social_media_posts")
+}

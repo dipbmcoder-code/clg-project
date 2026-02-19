@@ -28,23 +28,19 @@ const nextConfig = {
   async rewrites() {
     return [
       {
-        source: '/admin/login',
-        destination: `${process.env.NEXT_PUBLIC_STRAPI_API_URL}/admin/login`,
-      },
-      {
-        source: '/admin/users/me',
-        destination: `${process.env.NEXT_PUBLIC_STRAPI_API_URL}/admin/users/me`,
+        source: '/api/:path*',
+        destination: `${process.env.NEXT_PUBLIC_API_URL}/api/:path*`,
       },
       {
         source: '/uploads/:path*',
-        destination: `${process.env.NEXT_PUBLIC_STRAPI_API_URL}/uploads/:path*`,
+        destination: `${process.env.NEXT_PUBLIC_API_URL}/uploads/:path*`,
       },
     ];
   },
 };
 
 const isDevelopment = process.env.NODE_ENV === 'development';
- 
+
 module.exports = isDevelopment
   ? withHydrationOverlay({
       appRootSelector: 'main',

@@ -29,6 +29,8 @@
     "@mui/x-data-grid": "^7.3.2",
     "@mui/x-data-grid-pro": "^7.10.0",
     "@mui/x-date-pickers": "^7.10.0",
+    "@next/swc-win32-x64-msvc": "^14.2.30",
+    "@popperjs/core": "^2.11.8",
     "autosuggest-highlight": "^3.3.4",
     "axios": "^1.6.2",
     "countries-list": "^3.1.1",

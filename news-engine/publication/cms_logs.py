@@ -10,7 +10,7 @@ from auth.session_manager import session_manager
 
 
 CMS_NEWS_LOG_URL = (
-    f"{os.getenv('CMS_BASE_URL')}/content-manager/collection-types/api::news-log.news-log"
+    f"{os.getenv('CMS_BASE_URL')}/api/news-logs"
 )
 
 
@@ -54,7 +54,7 @@ def insert_news_log(
             print("⚠️ CMS session unavailable; skipping news log creation.")
             return False
 
-        # Format datetime for Strapi (ISO 8601 with 'Z' suffix)
+        # Format datetime (ISO 8601 with 'Z' suffix)
         if log_time:
             formatted_time = log_time
         else:
