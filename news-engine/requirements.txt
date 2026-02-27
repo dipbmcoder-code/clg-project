@@ -7,11 +7,12 @@ psycopg2-binary==2.9.10
 openai==1.63.2
 google-genai==1.52.0
 boto3==1.28.0
-selenium==4.9.1
+selenium==4.41.0
+undetected-chromedriver==3.5.5
+setuptools>=82.0.0
 beautifulsoup4==4.12.3
 fake-useragent==1.5.1
 schedule==1.2.2
-praw==7.8.1
 pycryptodome==3.19.0
 pytz==2023.3
 python-multipart==0.0.9

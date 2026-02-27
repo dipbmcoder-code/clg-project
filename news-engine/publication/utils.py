@@ -144,11 +144,18 @@ def generate_openRouter_image(prompt, id, l_version, types):
 
 def generate_gemini_image(prompt, id, l_version, types):
     
-    if os.getenv("IMAGE_GENERATE_SERVICE") == 'openrouter':
+    service = os.getenv("IMAGE_GENERATE_SERVICE", "")
+    
+    if service == 'skip' or service == 'none':
+        print("⏭️ Image generation skipped (IMAGE_GENERATE_SERVICE=skip)")
+        from publication.message_tracker import add_message, MessageStage, MessageStatus
+        add_message(types, MessageStage.IMAGE_GENERATION, MessageStatus.SUCCESS, "Image generation skipped")
+        return
+    elif service == 'openrouter':
         generate_openRouter_image(prompt, id, l_version, types)
-    elif os.getenv("IMAGE_GENERATE_SERVICE") == 'imagen':
+    elif service == 'imagen':
         generate_imagen_image(prompt, id, l_version, types)
-    elif os.getenv("IMAGE_GENERATE_SERVICE") == 'gemini-flash-image':
+    elif service == 'gemini-flash-image':
         generate_gemini_flash_image(prompt, id, l_version, types)
     else:
         print("called gemini image generation")
@@ -307,19 +314,24 @@ def check_data_exists_in_db(data, id, field_name):
 
 def check_is_posted(data, website_id):
     website_ids = data.get("website_ids")
+    if isinstance(website_ids, str):
+        try:
+            website_ids = json.loads(website_ids)
+        except (json.JSONDecodeError, TypeError):
+            website_ids = []
     return (
         data.get("is_posted") is True and
         isinstance(website_ids, list) and
-        website_id in website_ids
+        str(website_id) in [str(w) for w in website_ids]
     )
 
 def update_post_in_db(id, table_name, websiteIds):
-    website_ids = f"'{json.dumps(websiteIds)}'::jsonb"
+    website_ids_json = json.dumps([str(w) for w in websiteIds])
     update_query = (
         f"UPDATE {table_name} "
         f"SET is_posted = TRUE, "
         f"posted_datetime = NOW(), "
-        f"website_ids = {website_ids} "
+        f"website_ids = '{website_ids_json}'::jsonb "
         f"WHERE id = {id} ;"
     )
     insert_db(update_query)
@@ -355,31 +367,91 @@ def generate_openai_content(prompt, key=None):
     error_message = None
     content = None
     try:
-        if os.getenv("CONTENT_GENERATE_SERVICE") == 'openrouter':
+        service = os.getenv("CONTENT_GENERATE_SERVICE", "openai")
+
+        if service == 'gemini':
+            # Use Gemini SDK directly for content generation with key rotation
+            gemini_keys_str = os.getenv("GOOGLE_GEMINI_API_KEYS", "")
+            primary_key = os.getenv("GOOGLE_GEMINI_API_KEY", "")
+            # Build list of keys: primary + extras from GOOGLE_GEMINI_API_KEYS (comma-separated)
+            all_keys = [primary_key] if primary_key else []
+            if gemini_keys_str:
+                for k in gemini_keys_str.split(","):
+                    k = k.strip()
+                    if k and k not in all_keys:
+                        all_keys.append(k)
+            if not all_keys:
+                raise Exception("No Gemini API keys configured")
+
+            gemini_model = os.getenv("GOOGLE_GEMINI_CONTENT_MODEL", "gemini-2.0-flash")
+            last_error = None
+            for key_idx, api_key in enumerate(all_keys):
+                gemini_client = genai.Client(api_key=api_key)
+                max_retries = 2
+                for attempt in range(1, max_retries + 1):
+                    try:
+                        response = gemini_client.models.generate_content(
+                            model=gemini_model,
+                            contents=prompt,
+                        )
+                        content = response.text
+                        content_generated = True
+                        break
+                    except Exception as gemini_err:
+                        last_error = gemini_err
+                        err_str = str(gemini_err)
+                        if '429' in err_str and attempt < max_retries:
+                            wait_time = 10 * attempt
+                            print(f"⏳ Gemini rate limited (key {key_idx+1}), waiting {wait_time}s (attempt {attempt}/{max_retries})...")
+                            sleep(wait_time)
+                        elif '429' in err_str and key_idx < len(all_keys) - 1:
+                            print(f"⏳ Key {key_idx+1} exhausted, trying next key...")
+                            break  # try next key
+                        else:
+                            raise gemini_err
+                if content_generated:
+                    break
+            if not content_generated and last_error:
+                raise last_error
+        elif service == 'openrouter':
             client = OpenAI(
                 base_url="https://openrouter.ai/api/v1",
                 api_key=os.getenv("OPEN_ROUTER_API_KEY"),
             )
+            model = os.getenv("OPEN_ROUTER_CONTENT_MODEL", "google/gemini-2.0-flash-001")
+            response = client.chat.completions.create(
+                model=model,
+                messages=[
+                    {"role": "system", "content": "You are a helpful assistant."},
+                    {"role": "user", "content": prompt}
+                ],
+                temperature=1,
+                max_completion_tokens=2000,
+                top_p=1,
+                frequency_penalty=0,
+                presence_penalty=0
+            )
+            content = response.choices[0].message.content
+            content_generated = True
         else:
+            # Default: OpenAI
             client = openai
             openai.api_key = os.getenv('OPENAI_API_KEY')
-
-
-        response = client.chat.completions.create(
-            model=os.getenv('OPENAI_MODEL'),
-            messages=[
-                {"role": "system", "content": "You are a helpful assistant."},
-                {"role": "user", "content": prompt}
-            ],
-            # extra_body={"reasoning": {"enabled": True}},
-            temperature=1,
-            max_completion_tokens=2000,
-            top_p=1,
-            frequency_penalty=0,
-            presence_penalty=0
-        )
-        content = response.choices[0].message.content
-        content_generated = True
+            model = os.getenv('OPENAI_MODEL')
+            response = client.chat.completions.create(
+                model=model,
+                messages=[
+                    {"role": "system", "content": "You are a helpful assistant."},
+                    {"role": "user", "content": prompt}
+                ],
+                temperature=1,
+                max_completion_tokens=2000,
+                top_p=1,
+                frequency_penalty=0,
+                presence_penalty=0
+            )
+            content = response.choices[0].message.content
+            content_generated = True
 
     except Exception as _ex:
         error_message = f"Error: {_ex}"

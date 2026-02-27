@@ -16,8 +16,9 @@ import json
 import psycopg2
 import psycopg2.extras
 from datetime import datetime, timezone
+from time import sleep as api_delay
 
-from publication.config import host, user, password, db_name
+from publication.config import host, port, user, password, db_name
 from publication.app_test import main_publication2
 from publication.save_img_aws import delete_img, save_aws
 from publication.utils import check_data_exists_in_db, check_is_posted, update_post_in_db
@@ -35,7 +36,7 @@ def get_websites_from_db():
     """Fetch enabled websites directly from PostgreSQL."""
     conn = None
     try:
-        conn = psycopg2.connect(host=host, user=user, password=password, database=db_name)
+        conn = psycopg2.connect(host=host, port=port, user=user, password=password, database=db_name)
         with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
             cur.execute("""
                 SELECT * FROM websites 
@@ -54,7 +55,7 @@ def get_prompts_from_db():
     """Fetch news prompts directly from PostgreSQL."""
     conn = None
     try:
-        conn = psycopg2.connect(host=host, user=user, password=password, database=db_name)
+        conn = psycopg2.connect(host=host, port=port, user=user, password=password, database=db_name)
         with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
             cur.execute("SELECT * FROM news_prompts ORDER BY id LIMIT 1")
             row = cur.fetchone()
@@ -71,7 +72,7 @@ def insert_log_to_db(news_type, title, website_name, image_generated, status, me
     """Insert news log directly to PostgreSQL."""
     conn = None
     try:
-        conn = psycopg2.connect(host=host, user=user, password=password, database=db_name)
+        conn = psycopg2.connect(host=host, port=port, user=user, password=password, database=db_name)
         with conn.cursor() as cur:
             msg_json = json.dumps(message) if isinstance(message, (dict, list)) else message
             cur.execute(
@@ -104,11 +105,23 @@ handles = set()
 subreddits = set()
 for w in websites:
     for h in (w.get("twitter_handles") or []):
+        val = None
         if isinstance(h, str) and h.strip():
-            handles.add(h.strip().replace("@", ""))
-    for s in (w.get("reddit_subreddits") or []):
-        if isinstance(s, str) and s.strip():
-            subreddits.add(s.strip().replace("r/", ""))
+            val = h.strip().replace("@", "")
+        elif isinstance(h, dict):
+            val = (h.get("value") or h.get("label") or "").strip().replace("@", "")
+        if val:
+            handles.add(val)
+
+    if w.get("enable_reddit"):
+        for s in (w.get("reddit_subreddits") or []):
+            val = None
+            if isinstance(s, str) and s.strip():
+                val = s.strip().replace("r/", "")
+            elif isinstance(s, dict):
+                val = (s.get("value") or s.get("label") or "").strip().replace("r/", "")
+            if val:
+                subreddits.add(val)
 
 handles = list(handles)
 subreddits = list(subreddits)
@@ -140,6 +153,12 @@ if not all_posts:
     sys.exit(0)
 
 print(f"📊 Total posts to process: {len(all_posts)}")
+
+# Optional: limit posts per run to avoid API quota exhaustion
+max_posts = int(os.getenv("MAX_POSTS_PER_RUN", "0")) or len(all_posts)
+if max_posts < len(all_posts):
+    all_posts = all_posts[:max_posts]
+    print(f"📊 Limited to {max_posts} posts per run (MAX_POSTS_PER_RUN)")
 
 current_db_posts = current_db_social_media_posts()
 
@@ -200,6 +219,9 @@ for post in all_posts:
             generate_post_image(post, key, l_version, types, website=website)
             save_aws(key, l_version, types)
 
+            # Brief delay before content generation to avoid API rate limits
+            api_delay(5)
+
             published = main_publication2(data=post, types=types, key=key, website=website)
 
             if not published:
@@ -258,9 +280,6 @@ for post in all_posts:
         
         # Clear messages for this post
         message_tracker.clear_messages(types)
-    
-    print("✅ Social media cron job finished (X API)")
-else:
-    print("ℹ️ Social media module not enabled for any websites")
 
+print("✅ Social media pipeline finished")
 print("cron job finished")

@@ -20,7 +20,7 @@ import useCustomSnackbar from 'src/hooks/use-custom-snackbar';
 import { AutoCompleteBox, AutoSelectCountry, FreeTextMultipleInput } from 'src/custom';
 
 import { Edit as EditIcon } from '@mui/icons-material';
-import { RHFContactField, RHFPasswordField, RHFPromptField, RHFSwitch, RHFTextField } from 'src/components/hook-form';
+import { RHFContactField, RHFPasswordField, RHFPromptField, RHFSelect, RHFSwitch, RHFTextField } from 'src/components/hook-form';
 
 // const formatDate = (date) => {
 //   const year = date.getFullYear();

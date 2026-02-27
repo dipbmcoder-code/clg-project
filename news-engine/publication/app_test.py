@@ -31,15 +31,21 @@ def publish(data_j, featured_image, title, text_all, types, key, l_version, play
         application_password = data_j.get('application_password', '')
         author = data_j.get('website_author') or []
 
-        decryptPassword = decrypt_password(password)
+        # Try to decrypt password; fall back to plain text if decryption fails
+        decryptPassword = None
+        try:
+            decryptPassword = decrypt_password(password)
+        except Exception:
+            pass
         if not decryptPassword:
-            print(f"❌ Password decryption failed for {platform_name}")
-            return None
+            # Password stored as plain text — use as-is
+            decryptPassword = password
+            print(f"ℹ️ Using plain text password for {platform_name}")
 
         if auth_type == 'json':
             credentials = user + ':' + decryptPassword
         else:
-            credentials = user + ':' + application_password
+            credentials = user + ':' + (application_password or decryptPassword)
 
         category = "1"
         tags = ''
@@ -48,10 +54,13 @@ def publish(data_j, featured_image, title, text_all, types, key, l_version, play
                 category_ids = []
                 for cat in data_j['categories']:
                     if isinstance(cat, dict):
-                        category_ids.append(str(cat.get('id')))
+                        cat_id = cat.get('id') or cat.get('value')
+                        if cat_id:
+                            category_ids.append(str(cat_id))
                     else:
                         category_ids.append(str(cat))
-                category = ','.join(category_ids)
+                if category_ids:
+                    category = ','.join(category_ids)
             except Exception as e:
                 print(f"⚠️ Category parsing warning: {e}")
                 category = "1"
@@ -90,7 +99,9 @@ def publish(data_j, featured_image, title, text_all, types, key, l_version, play
                 print(f"⚠️ Image file not found: {img_path}")
         
         if author and isinstance(author, list) and len(author) > 0:
-            post['author'] = author[0].get("id")
+            author_id = author[0].get('id') or author[0].get('value')
+            if author_id:
+                post['author'] = author_id
 
         # Send Post Request
         response = requests.post(url + '/wp-json/wp/v2/posts', headers=header, json=post)

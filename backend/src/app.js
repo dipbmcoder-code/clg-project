@@ -14,6 +14,8 @@ const postsRoutes = require('./routes/posts');
 const dashboardRoutes = require('./routes/dashboard');
 const usersRoutes = require('./routes/users');
 const wordpressRoutes = require('./routes/wordpress');
+const aiSettingsRoutes = require('./routes/aiSettings');
+const cronRoutes = require('./routes/cron');
 
 const app = express();
 
@@ -42,6 +44,8 @@ app.use('/api/social-posts', postsRoutes);
 app.use('/api/dashboard', dashboardRoutes);
 app.use('/api/users', usersRoutes);
 app.use('/api/wordpress', wordpressRoutes);
+app.use('/api/ai-settings', aiSettingsRoutes);
+app.use('/api/cron', cronRoutes);
 
 // ─── 404 handler ───
 app.use((_req, res) => {

@@ -33,10 +33,19 @@ try:
 
     print(f"📁 Working directory: {WORKDIR}", flush=True)
     print(f"🐍 Python executable: {sys.executable}", flush=True)
+
+    # ── Create required result directories on startup ──
+    for d in ["result/img_match", "result/json"]:
+        os.makedirs(os.path.join(WORKDIR, d), exist_ok=True)
+    print("📂 Result directories verified", flush=True)
+
     print("=" * 50, flush=True)
 except Exception as e:
     print(f"❌ ERROR during initialization: {e}", flush=True, file=sys.stderr)
     sys.exit(1)
+
+# ── Thread-safe run lock (prevents overlapping runs) ──
+_social_media_lock = threading.Lock()
 
 def run_script(script_path):
     """Run a Python script using subprocess for proper isolation."""
@@ -71,17 +80,24 @@ def run_script(script_path):
         print(f"❌ ERROR running {script_path}: {str(e)}", flush=True, file=sys.stderr)
 
 def run_social_media():
-    run_script('social_media/main_social_media.py')
+    """Thread-safe wrapper — prevents overlapping pipeline runs."""
+    if not _social_media_lock.acquire(blocking=False):
+        print("⏭️ Social media pipeline already running, skipping this cycle.", flush=True)
+        return
+    try:
+        run_script('social_media/main_social_media.py')
+    finally:
+        _social_media_lock.release()
 
 # Run immediately on startup
 print("\n📋 Running social media pipeline on startup...", flush=True)
-threading.Thread(target=run_social_media).start()
+threading.Thread(target=run_social_media, daemon=True).start()
 
 # Schedule social media scraping every hour at :30
-schedule.every().hour.at(":30").do(lambda: threading.Thread(target=run_social_media).start())
+schedule.every().hour.at(":30").do(lambda: threading.Thread(target=run_social_media, daemon=True).start())
 
 # Also run every 3 hours for deeper scrape
-schedule.every(3).hours.do(lambda: threading.Thread(target=run_social_media).start())
+schedule.every(3).hours.do(lambda: threading.Thread(target=run_social_media, daemon=True).start())
 
 print("\n✅ Cron scheduler initialized!", flush=True)
 print("⏰ Schedule:", flush=True)

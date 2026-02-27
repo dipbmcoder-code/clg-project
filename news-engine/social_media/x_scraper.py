@@ -2,9 +2,12 @@
 X (Twitter) Scraper Wrapper
 Uses the existing Selenium-based scraper (no paid API key needed).
 Normalizes field names to match the standardized post format.
+Includes retry logic with exponential backoff.
 """
 import os
 import sys
+import time
+import random
 from datetime import datetime, timezone
 from typing import List, Dict
 
@@ -12,6 +15,11 @@ SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
 sys.path.append(os.path.dirname(SCRIPT_DIR))
 
 from publication.social_scraper import scrap_social_media_data
+
+# ── Constants ──
+MAX_RETRIES = 2
+RETRY_DELAY_BASE = 10  # seconds
+BETWEEN_HANDLE_DELAY = (8, 15)  # random range in seconds
 
 
 def _normalize_scraped_tweet(tweet: Dict) -> Dict:
@@ -65,10 +73,32 @@ def _normalize_scraped_tweet(tweet: Dict) -> Dict:
     }
 
 
+def _scrape_with_retry(handles: List[str]) -> List[Dict]:
+    """
+    Scrape X handles with retry + exponential backoff.
+    Returns raw tweets list.
+    """
+    for attempt in range(1, MAX_RETRIES + 1):
+        try:
+            raw_tweets = scrap_social_media_data(handles)
+            if raw_tweets:
+                return raw_tweets
+            print(f"⚠️ X scrape attempt {attempt}/{MAX_RETRIES} returned 0 tweets")
+        except Exception as e:
+            print(f"⚠️ X scrape attempt {attempt}/{MAX_RETRIES} failed: {e}")
+
+        if attempt < MAX_RETRIES:
+            delay = RETRY_DELAY_BASE * attempt + random.uniform(2, 5)
+            print(f"   Retrying in {delay:.0f}s...")
+            time.sleep(delay)
+
+    return []
+
+
 def fetch_x_data(handles: List[str], **kwargs) -> List[Dict]:
     """
     Main entry point — fetch tweets from X/Twitter handles using Selenium scraping.
-    No API key required.
+    No API key required. Includes retry logic.
 
     Args:
         handles: List of X/Twitter handles (without @)
@@ -86,7 +116,7 @@ def fetch_x_data(handles: List[str], **kwargs) -> List[Dict]:
     print(f"🔍 Scraping X posts for {len(clean_handles)} handles: {clean_handles}")
 
     try:
-        raw_tweets = scrap_social_media_data(clean_handles)
+        raw_tweets = _scrape_with_retry(clean_handles)
         normalized = []
 
         for tweet in raw_tweets:
