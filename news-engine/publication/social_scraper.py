@@ -64,7 +64,7 @@ def _type_human(element, text):
 class XBrowser:
     """Chrome session using undetected-chromedriver to bypass bot detection."""
 
-    def __init__(self, headless: bool = False):
+    def __init__(self, headless: bool = True):
         self.driver = None
         self.logged_in = False
         self.headless = headless
@@ -532,7 +532,7 @@ class SocialMediaScraper:
         if self._browser and self._browser.driver:
             tweets = self._browser.scrape_profile(self.username, max_tweets=max_tweets)
         else:
-            b = XBrowser(headless=False)
+            b = XBrowser(headless=True)
             try:
                 b.start()
                 b.login()
@@ -572,7 +572,7 @@ def scrap_social_media_data(handlers: List[str]) -> List[Dict]:
         return []
 
     all_tweets = []
-    browser = XBrowser(headless=False)
+    browser = XBrowser(headless=True)
 
     try:
         browser.start()

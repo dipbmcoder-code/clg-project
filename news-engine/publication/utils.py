@@ -865,10 +865,11 @@ def generate_imagen_image(prompt, id, l_version, types):
 
 def generate_gemini_flash_image(prompt, id, l_version, types):
     """
-    Generate image using Gemini 2.5 Flash Image model via Google GenAI SDK.
-    Based on the new generate_content API with image generation capabilities.
+    Generate image using Gemini 3.1 Flash Image Preview (Nano Banana 2) via Google GenAI SDK.
+    Uses the latest generate_content API with response_modalities and image_config.
+    Ref: https://ai.google.dev/gemini-api/docs/image-generation
     """
-    print("called Gemini 2.5 Flash Image via Google GenAI SDK")
+    print("called Gemini 3.1 Flash Image Preview (Nano Banana 2) via Google GenAI SDK")
 
     image_generated = False
     error_message = None
@@ -880,18 +881,25 @@ def generate_gemini_flash_image(prompt, id, l_version, types):
             try:
                 print(f"[INFO] Gemini Flash Image generation attempt {attempt}/{max_retries}")
                 
-                api_key = os.getenv("GOOGLE_API_KEY") or os.getenv("GOOGLE_GEMINI_API_KEY")
+                api_key = os.getenv("GOOGLE_GEMINI_API_KEY")
                 if not api_key:
-                    raise Exception("No Google API key found (checked GOOGLE_API_KEY and GOOGLE_GEMINI_API_KEY)")
+                    raise Exception("No GOOGLE_GEMINI_API_KEY found in environment")
                     
                 client = genai.Client(api_key=api_key)
                 
-                # Use gemini-2.5-flash-image model
-                model = os.getenv("GOOGLE_GEMINI_MODEL") or "gemini-2.5-flash-image"
+                # Use gemini-3.1-flash-image-preview (Nano Banana 2) — latest model
+                model = os.getenv("GOOGLE_GEMINI_MODEL") or "gemini-3.1-flash-image-preview"
                 
                 response = client.models.generate_content(
                     model=model,
-                    contents=[prompt]
+                    contents=[prompt],
+                    config=genai_types.GenerateContentConfig(
+                        response_modalities=['TEXT', 'IMAGE'],
+                        image_config=genai_types.ImageConfig(
+                            aspect_ratio="16:9",
+                            image_size="1K",
+                        ),
+                    ),
                 )
                 
                 # --- Save Full Response Log ---
@@ -899,17 +907,20 @@ def generate_gemini_flash_image(prompt, id, l_version, types):
 
                 if not hasattr(response, 'parts') or not response.parts:
                     with open(log_path, "w") as f:
-                        json.dump({"error": response}, f, indent=2, default=str)
+                        json.dump({"error": str(response)}, f, indent=2, default=str)
                     print(f"[INFO] Response saved to {log_path}")
                     raise Exception("No parts returned from Gemini Flash Image.")
 
-                # Iterate through parts to find image
+                # Iterate through parts — skip thought parts, find image
                 image_found = False
                 for part in response.parts:
+                    # Skip thinking/thought parts (Gemini 3 models use thinking by default)
+                    if hasattr(part, 'thought') and part.thought:
+                        continue
                     if part.text is not None:
-                        print(f"[INFO] Text response: {part.text}")
+                        print(f"[INFO] Text response: {part.text[:200] if part.text else ''}")
                     elif part.inline_data is not None:
-                        # Found image data
+                        # Found image data — save using SDK helper
                         image = part.as_image()
                         output_path = root_folder / "result" / "img_match" / f"{l_version}_{id}_{types}.png"
                         image.save(str(output_path))
@@ -924,7 +935,7 @@ def generate_gemini_flash_image(prompt, id, l_version, types):
                     break  # Success, exit retry loop
                 else:
                     with open(log_path, "w") as f:
-                        json.dump({"error": response}, f, indent=2, default=str)
+                        json.dump({"error": str(response)}, f, indent=2, default=str)
                     print(f"[INFO] Response saved to {log_path}")
                     raise Exception("No image data found in response parts.")
 
@@ -960,6 +971,6 @@ def generate_gemini_flash_image(prompt, id, l_version, types):
             types,
             MessageStage.IMAGE_GENERATION,
             MessageStatus.SUCCESS if image_generated else MessageStatus.ERROR,
-            "Image generated successfully using Gemini 2.5 Flash Image" if image_generated else "Image generation failed",
+            "Image generated successfully using Gemini 3.1 Flash Image Preview" if image_generated else "Image generation failed",
             error_details=None if image_generated else error_message,
         )

@@ -20,7 +20,7 @@ from time import sleep as api_delay
 
 from publication.config import host, port, user, password, db_name
 from publication.app_test import main_publication2
-from publication.save_img_aws import delete_img, save_aws
+from publication.save_img_aws import save_image_locally
 from publication.utils import check_data_exists_in_db, check_is_posted, update_post_in_db
 from social_media.insert_social_media_api import insert_social_media_post, current_db_social_media_posts
 from social_media.image_social_media_api import generate_post_image
@@ -97,6 +97,15 @@ if not websites:
     sys.exit(0)
 
 prompts = get_prompts_from_db()
+if prompts:
+    prompt_keys = ['social_media_news_title_prompt', 'social_media_news_content_prompt', 'social_media_news_image_prompt']
+    loaded = [k for k in prompt_keys if prompts.get(k)]
+    missing = [k for k in prompt_keys if not prompts.get(k)]
+    print(f"✅ Loaded {len(loaded)} custom prompts from DB: {loaded}")
+    if missing:
+        print(f"⚠️ Missing/empty prompts (will use defaults): {missing}")
+else:
+    print("⚠️ No prompts found in news_prompts table — using default prompts")
 for w in websites:
     w.update(prompts)
 
@@ -127,6 +136,38 @@ handles = list(handles)
 subreddits = list(subreddits)
 print(f"📋 Sources: {len(handles)} X handles, {len(subreddits)} subreddits")
 
+# ── Helpers for saving scraped data ──
+RESULT_DIR = os.path.join(SCRIPT_DIR, "..", "result")
+os.makedirs(RESULT_DIR, exist_ok=True)
+
+def _save_scraped_json(data, filename_prefix):
+    """Save scraped posts to a dated JSON file in result/."""
+    today_str = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+    filepath = os.path.join(RESULT_DIR, f"{filename_prefix}_{today_str}.json")
+    try:
+        # Append to existing file if same day, otherwise create new
+        existing = []
+        if os.path.exists(filepath):
+            with open(filepath, "r", encoding="utf-8") as f:
+                existing = json.load(f)
+        existing.extend(data)
+        with open(filepath, "w", encoding="utf-8") as f:
+            json.dump(existing, f, indent=2, ensure_ascii=False, default=str)
+        print(f"💾 Saved {len(data)} posts → {filepath}")
+    except Exception as e:
+        print(f"⚠️ Failed to save {filepath}: {e}")
+
+IMG_MATCH_DIR = os.path.join(SCRIPT_DIR, "..", "result", "img_match")
+
+def _cleanup_temp_image(key, l_version, types):
+    """Remove temp image from img_match/ after it's been archived to result/images/."""
+    try:
+        temp_path = os.path.join(IMG_MATCH_DIR, f"{l_version}_{key}_{types}.png")
+        if os.path.exists(temp_path):
+            os.remove(temp_path)
+    except Exception as e:
+        print(f"⚠️ Temp image cleanup failed: {e}")
+
 # Fetch posts from all sources
 all_posts = []
 
@@ -136,6 +177,8 @@ if subreddits:
         reddit_posts = fetch_reddit_data(subreddits, mode="hot", limit=15, hours_ago=12)
         all_posts.extend(reddit_posts)
         print(f"✅ Reddit: {len(reddit_posts)} posts")
+        if reddit_posts:
+            _save_scraped_json(reddit_posts, "reddit_posts")
     except Exception as e:
         print(f"❌ Reddit scraping error: {e}")
 
@@ -145,6 +188,8 @@ if handles:
         x_posts = fetch_x_data(handles)
         all_posts.extend(x_posts)
         print(f"✅ X: {len(x_posts)} posts")
+        if x_posts:
+            _save_scraped_json(x_posts, "x_posts")
     except Exception as e:
         print(f"❌ X scraping error: {e}")
 
@@ -217,7 +262,7 @@ for post in all_posts:
 
         try:
             generate_post_image(post, key, l_version, types, website=website)
-            save_aws(key, l_version, types)
+            save_image_locally(key, l_version, types)
 
             # Brief delay before content generation to avoid API rate limits
             api_delay(5)
@@ -250,7 +295,8 @@ for post in all_posts:
                 website_ids.remove(wid)
 
         finally:
-            delete_img(key, l_version, types)
+            # Clean up temp image from img_match/ (permanent copy is in result/images/)
+            _cleanup_temp_image(key, l_version, types)
 
             messages_json = message_tracker.get_messages_json(types)
             overall_status = message_tracker.get_overall_status(types)

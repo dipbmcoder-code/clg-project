@@ -2,6 +2,7 @@ import os
 import json
 import base64
 import requests
+from datetime import datetime
 from dotenv import load_dotenv
 from pathlib import Path
 
@@ -166,7 +167,8 @@ def main_publication2(data, types, key, website):
     
     # Check l_version
     l_version = website.get('l_version') or 'eng'
-    featured_image_url = f"{os.getenv('AWS_URL')}/match/{l_version}_{key}_{types}.png"
+    # Use local image path (no AWS upload)
+    featured_image_url = str(root_folder / 'result' / 'images' / datetime.now().strftime('%Y-%m-%d') / f'{l_version}_{key}_{types}.png')
 
     # Prepare Prompts
     prompt_vars = {
@@ -181,10 +183,12 @@ def main_publication2(data, types, key, website):
     custom_news = website.get('social_media_news_content_prompt')
     
     if custom_news and custom_title:
+        print(f"📝 Using custom prompts from DB for content generation")
         news_prompt = replace_vars(custom_news, prompt_vars)
         title_prompt = replace_vars(custom_title, prompt_vars)
         list_text = [title_prompt, news_prompt]
     else:
+        print(f"⚠️ Custom prompts missing (title={bool(custom_title)}, content={bool(custom_news)}), using default prompts")
         # Fallback prompts
         list_text = [
             f"Write a professional, SEO-optimized headline for a news story based on this content: '{tweet_text[:100]}'. The headline should be compelling and journalistic. Do NOT mention social media.",

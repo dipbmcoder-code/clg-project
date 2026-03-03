@@ -133,7 +133,7 @@ def fetch_x_data(handles: List[str], **kwargs) -> List[Dict]:
 
 
 if __name__ == "__main__":
-    test_handles = ["elikibaara"]
+    test_handles = ["elonmusk"]
     print(f"🚀 Scraping X posts for {test_handles}")
     results = fetch_x_data(test_handles)
 
