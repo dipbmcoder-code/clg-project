@@ -134,7 +134,7 @@ function Website({
 
   const memoizedData = useMemo(() => ({ ...data }), [data]);
 
-  const sections = [
+  const sections = useMemo(() => [
     {
       id: 'general',
       title: 'General Settings',
@@ -252,7 +252,7 @@ function Website({
         },
       ],
     },
-  ];
+  ], [isValidated, wpAuthors, wpCategories, data]);
 
   return (
     <Container maxWidth={settings.themeStretch ? false : 'xl'}>

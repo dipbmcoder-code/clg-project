@@ -85,7 +85,12 @@ export default function AutoCompleteBox({ control, setValue, field, helperText, 
   };
 
   useEffect(() => {
-    fetchOptions();
+    // Initialize static options if provided, otherwise fetch dynamic options
+    if (field.options && Array.isArray(field.options)) {
+      setAllOptions(field.options.map(normalizeOption));
+    } else {
+      fetchOptions();
+    }
   }, [parent, hasInteracted]);
 
   const debouncedSearchText = useCallback(

@@ -1,7 +1,7 @@
 'use client';
 
 import PropTypes from 'prop-types';
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Box, Tabs, Tab } from '@mui/material';
 import CustomFormComponent from './CustomFormComponent';
 import FormButtons from './FormButtons';
@@ -148,16 +148,20 @@ export default function CustomAccordionForm({
   const { reset, handleSubmit, control, watch, formState: { isDirty, isSubmitting, dirtyFields, isLoading, defaultValues } } = methods;
   const values = watch();
 
-  const fieldTypes = {
-    ...sections.flatMap(section => section.fields).reduce((acc, field) => {
+  // Stable field-type map — only changes when sections definition changes
+  const fieldTypes = useMemo(() => 
+    sections.flatMap(section => section.fields).reduce((acc, field) => {
       acc[field.name] = field.type;
       return acc;
     }, {}),
-  };
+  [sections]);
+
+  // Build flat field list once per sections change
+  const allFields = useMemo(() => sections.flatMap(section => section.fields), [sections]);
 
   useEffect(() => {
     const fetchDefaultValues = async () => {
-      const defaultValuesPromises = sections.flatMap(section => section.fields).map(async (field) => {
+      const defaultValuesPromises = allFields.map(async (field) => {
         const sectionDialog = {
           ...(dialog || {}),
           value: {
@@ -176,11 +180,41 @@ export default function CustomAccordionForm({
     };
 
     fetchDefaultValues();
-  }, [dialog, reset, sections, JSON.stringify(dialog.value)]);
+    // NOTE: Only depend on dialog (the data) — not on sections/allFields
+    // (sections change when wpCategories load, which would wipe unsaved edits)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [dialog, reset]);
 
   async function getDefaultFieldValue(field, dialog) {
     switch (field.type) {
+      case 'free_text_multiple':
+        // Always return an array for multi-value fields
+        return dialog?.value?.[field.name] && Array.isArray(dialog.value[field.name])
+          ? dialog.value[field.name]
+          : [];
       case 'select':
+        const selectFieldValue = field.fieldValue;
+        const selectValue = dialog?.value?.[field.name];
+        
+        if (selectFieldValue) {
+          return selectFieldValue;
+        }
+        
+        // For select fields, find the option that matches the stored value
+        if (selectValue && field.options) {
+          const matchingOption = field.options.find(opt => 
+            (opt.value || opt) === selectValue || 
+            (opt.label || opt) === selectValue
+          );
+          if (matchingOption) {
+            return {
+              label: matchingOption.label || matchingOption,
+              value: matchingOption.value || matchingOption
+            };
+          }
+        }
+        
+        return null;
       // case 'select_country':
       //   return processData(field);
       case 'pre_select':
@@ -237,12 +271,16 @@ export default function CustomAccordionForm({
         if (dialog && dialog.documentId) {
           updatedData.id = dialog.documentId;
         }
+
         for (const fieldName in editFields) {
           if (formData.hasOwnProperty(fieldName)) {
             const fieldValue = formData[fieldName];
             const defaultValue = defaultValues[fieldName];
 
-            if (fieldTypes[fieldName] === 'file') {
+            if (fieldTypes[fieldName] === 'free_text_multiple') {
+              // Always send the full array of {label, value} objects
+              updatedData[fieldName] = Array.isArray(fieldValue) ? fieldValue : [];
+            } else if (fieldTypes[fieldName] === 'file') {
               if (!updatedData._files) {
                 updatedData._files = {};
               }
@@ -268,6 +306,9 @@ export default function CustomAccordionForm({
               updatedData[fieldName] = Array.isArray(fieldValue)
                 ? fieldValue.filter(Boolean).join(',')
                 : fieldValue;
+            } else if (fieldTypes[fieldName] === 'select') {
+              // For select fields, extract the value from the {label, value} object
+              updatedData[fieldName] = fieldValue?.value || fieldValue;
             } else if (Array.isArray(fieldValue) && Array.isArray(defaultValue)) {
               if (custom_data) {
                 updatedData[fieldName] = fieldValue.map((obj) => obj.value).join(',');

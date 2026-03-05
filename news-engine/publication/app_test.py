@@ -15,9 +15,17 @@ from publication.message_tracker import add_message, MessageStage, MessageStatus
 load_dotenv()
 root_folder = Path(__file__).resolve().parents[1]
 
-def publish(data_j, featured_image, title, text_all, types, key, l_version, player_id):
+def publish(data_j, title, text_all, types, key, l_version, **kwargs):
     """
     Publish content to WordPress via REST API.
+
+    Args:
+        data_j: Website config dict (platform_url, platform_user, etc.)
+        title: Article headline
+        text_all: Article HTML body
+        types: Module type string (e.g. 'social_media')
+        key: Unique key for image file naming
+        l_version: Language version (eng, ru, etc.)
     """
     try:
         platform_name = data_j.get('platform_name', 'wordpress')
@@ -145,9 +153,55 @@ def publish(data_j, featured_image, title, text_all, types, key, l_version, play
         return None
 
 
-def main_publication2(data, types, key, website):
+def _build_source_embed(data):
+    """
+    Build an embed/iframe of the original social media post.
+    Used as visual fallback when AI image generation fails.
+
+    Returns HTML string — Twitter blockquote or Reddit iframe.
+    """
+    source = data.get("source", "")
+    permalink = data.get("permalink", "")
+
+    if source == "x" and permalink:
+        # Twitter/X oEmbed blockquote — WordPress renders this natively
+        handler = data.get("handler") or data.get("source_handle", "")
+        tweet_text = data.get("tweet_text", "")
+        return (
+            f'<blockquote class="twitter-tweet" data-dnt="true">'
+            f'<p>{tweet_text[:280]}</p>'
+            f'&mdash; @{handler.replace("@", "")}'
+            f'<a href="{permalink}">{data.get("timestamp", "")}</a>'
+            f'</blockquote>'
+            f'<script async src="https://platform.twitter.com/widgets.js" charset="utf-8"></script>'
+        )
+
+    elif source == "reddit" and permalink:
+        # Reddit oEmbed iframe
+        # Convert permalink to redditmedia embed URL
+        embed_url = permalink.replace("https://reddit.com", "https://www.redditmedia.com")
+        if "?" not in embed_url:
+            embed_url += "?ref_source=embed&ref=share&embed=true&theme=dark"
+        else:
+            embed_url += "&ref_source=embed&ref=share&embed=true&theme=dark"
+        return (
+            f'<iframe id="reddit-embed" '
+            f'src="{embed_url}" '
+            f'sandbox="allow-scripts allow-same-origin allow-popups" '
+            f'style="border:none; width:100%; min-height:400px;" '
+            f'width="640" height="auto" scrolling="yes">'
+            f'</iframe>'
+        )
+
+    # No embed possible — return empty
+    return ""
+
+
+def main_publication2(data, types, key, website, image_ready=True):
     """
     Main logic to generate and publish content.
+    When image_ready=False, embeds the original social media post (iframe/blockquote)
+    into the article as a visual source reference.
     """
     if types != 'social_media':
         print(f"ℹ️ main_publication2 called with unsupported type: {types}")
@@ -167,8 +221,6 @@ def main_publication2(data, types, key, website):
     
     # Check l_version
     l_version = website.get('l_version') or 'eng'
-    # Use local image path (no AWS upload)
-    featured_image_url = str(root_folder / 'result' / 'images' / datetime.now().strftime('%Y-%m-%d') / f'{l_version}_{key}_{types}.png')
 
     # Prepare Prompts
     prompt_vars = {
@@ -234,14 +286,24 @@ def main_publication2(data, types, key, website):
     for i in ['"', "'",'*']:
         title_openAI = title_openAI.replace(i, "") if i in title_openAI else title_openAI
 
+    # ── Embed original post when image generation failed ──
+    source_embed = ""
+    if not image_ready:
+        source_embed = _build_source_embed(data)
+        if source_embed:
+            source_label = "X (Twitter)" if data.get("source") == "x" else "Reddit"
+            print(f"📌 Embedding original {source_label} post (image gen failed)")
+        else:
+            print(f"⚠️ Could not build embed for source={data.get('source')}")
+
     # Construct HTML
     article_html = f"""
         <article>
         {''.join(main_text_list)}
         {additional_text}
         </article>
+        {source_embed}
         """
     
     # Publish
-    # Note: player_id param loops back to 'league_id' or unused param in original. We pass 0.
-    return publish(website, featured_image_url, title_openAI, article_html, types, key, l_version, 0)
+    return publish(website, title_openAI, article_html, types, key, l_version)

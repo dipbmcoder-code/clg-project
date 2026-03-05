@@ -67,7 +67,3 @@ def generate_post_image(post_data, key, l_version, types, website=None):
 
     generate_gemini_image(prompt, key, l_version, types)
 
-
-# Keep backward compatibility alias
-generate_tweet_image = generate_post_image
-

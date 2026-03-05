@@ -13,6 +13,7 @@ sys.path.append(os.path.dirname(SCRIPT_DIR))
 load_dotenv()
 
 import json
+import requests
 import psycopg2
 import psycopg2.extras
 from datetime import datetime, timezone
@@ -106,8 +107,17 @@ if prompts:
         print(f"⚠️ Missing/empty prompts (will use defaults): {missing}")
 else:
     print("⚠️ No prompts found in news_prompts table — using default prompts")
+
+# Merge only prompt-specific keys into website dicts
+# (avoid overwriting website.id, created_at, updated_at with prompt's values)
+prompt_only_keys = [
+    'social_media_news_title_prompt', 'social_media_news_content_prompt',
+    'social_media_news_image_prompt', 'ai_tone', 'ai_language', 'ai_max_words',
+]
 for w in websites:
-    w.update(prompts)
+    for k in prompt_only_keys:
+        if k in prompts:
+            w[k] = prompts[k]
 
 # Collect unique sources
 handles = set()
@@ -158,6 +168,14 @@ def _save_scraped_json(data, filename_prefix):
         print(f"⚠️ Failed to save {filepath}: {e}")
 
 IMG_MATCH_DIR = os.path.join(SCRIPT_DIR, "..", "result", "img_match")
+os.makedirs(IMG_MATCH_DIR, exist_ok=True)
+
+
+def _check_image_exists(key, l_version, types):
+    """Check if a generated image file actually exists on disk."""
+    img_path = os.path.join(IMG_MATCH_DIR, f"{l_version}_{key}_{types}.png")
+    return os.path.isfile(img_path) and os.path.getsize(img_path) > 0
+
 
 def _cleanup_temp_image(key, l_version, types):
     """Remove temp image from img_match/ after it's been archived to result/images/."""
@@ -167,6 +185,47 @@ def _cleanup_temp_image(key, l_version, types):
             os.remove(temp_path)
     except Exception as e:
         print(f"⚠️ Temp image cleanup failed: {e}")
+
+
+def _download_fallback_image(post, key, l_version, types):
+    """
+    Download the post's own embedded image as a fallback when AI image generation fails.
+    Saves the first available image from the post to the expected img_match path
+    so the WordPress upload in publish() still works.
+    
+    Returns True if a fallback image was saved, False otherwise.
+    """
+    post_images = post.get("images") or []
+    if not post_images:
+        print(f"⚠️ No fallback images available in post data")
+        return False
+
+    output_path = os.path.join(IMG_MATCH_DIR, f"{l_version}_{key}_{types}.png")
+
+    for idx, img_url in enumerate(post_images):
+        try:
+            if not img_url or not isinstance(img_url, str):
+                continue
+            print(f"🖼️ Downloading fallback image ({idx+1}/{len(post_images)}): {img_url[:80]}...")
+            resp = requests.get(img_url, timeout=15, stream=True)
+            resp.raise_for_status()
+
+            with open(output_path, "wb") as f:
+                for chunk in resp.iter_content(8192):
+                    f.write(chunk)
+
+            print(f"✅ Fallback image saved → {output_path}")
+
+            # Also archive to dated folder
+            save_image_locally(key, l_version, types)
+
+            return True
+        except Exception as e:
+            print(f"⚠️ Fallback image download failed for {img_url[:60]}: {e}")
+            continue
+
+    print(f"❌ All fallback image downloads failed")
+    return False
 
 # Fetch posts from all sources
 all_posts = []
@@ -261,13 +320,52 @@ for post in all_posts:
         workflow_success = False
 
         try:
-            generate_post_image(post, key, l_version, types, website=website)
-            save_image_locally(key, l_version, types)
+            # ── Step 1: Image generation (non-blocking) ──
+            # NOTE: generate_post_image → generate_gemini_image swallows exceptions
+            # internally (logs via message_tracker), so we MUST verify the file
+            # actually exists on disk rather than relying on exceptions.
+            image_ready = False
+            try:
+                generate_post_image(post, key, l_version, types, website=website)
+            except Exception as img_err:
+                print(f"⚠️ AI image generation threw: {img_err}")
+
+            # Verify the image file was actually created on disk
+            if _check_image_exists(key, l_version, types):
+                saved = save_image_locally(key, l_version, types)
+                if saved:
+                    image_ready = True
+                    print(f"✅ AI image generated & saved")
+                else:
+                    print(f"⚠️ AI image generated but local save failed")
+            else:
+                print(f"⚠️ AI image generation produced no file — will try fallback")
+
+            # ── Step 2: Fallback to post's own images if AI image failed ──
+            if not image_ready:
+                print(f"🖼️ Attempting fallback: using post's embedded images...")
+                image_ready = _download_fallback_image(post, key, l_version, types)
+                if image_ready:
+                    message_tracker.add_message(
+                        types,
+                        message_tracker.MessageStage.IMAGE_GENERATION,
+                        message_tracker.MessageStatus.SUCCESS,
+                        "Using post's original image as fallback",
+                    )
+                else:
+                    print(f"⚠️ No image available — publishing without featured image")
+                    message_tracker.add_message(
+                        types,
+                        message_tracker.MessageStage.IMAGE_GENERATION,
+                        message_tracker.MessageStatus.ERROR,
+                        "No image available (AI gen failed + no post images). Publishing without image.",
+                    )
 
             # Brief delay before content generation to avoid API rate limits
             api_delay(5)
 
-            published = main_publication2(data=post, types=types, key=key, website=website)
+            # ── Step 3: Content generation & publish (always runs) ──
+            published = main_publication2(data=post, types=types, key=key, website=website, image_ready=image_ready)
 
             if not published:
                 website_ids.pop()
