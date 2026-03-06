@@ -155,42 +155,79 @@ def publish(data_j, title, text_all, types, key, l_version, **kwargs):
 
 def _build_source_embed(data):
     """
-    Build an embed/iframe of the original social media post.
-    Used as visual fallback when AI image generation fails.
+    Build an embed of the original social media post.
+    Uses official oEmbed blockquote formats that WordPress renders natively.
 
-    Returns HTML string — Twitter blockquote or Reddit iframe.
+    Returns HTML string — Twitter blockquote or Reddit blockquote.
     """
     source = data.get("source", "")
     permalink = data.get("permalink", "")
 
     if source == "x" and permalink:
-        # Twitter/X oEmbed blockquote — WordPress renders this natively
+        # Official Twitter/X oEmbed blockquote format
         handler = data.get("handler") or data.get("source_handle", "")
+        clean_handle = handler.replace("@", "")
         tweet_text = data.get("tweet_text", "")
+        embedded_url = data.get("embedded_url", "")
+        timestamp = data.get("timestamp", "")
+
+        # Format date as "March 6, 2026"
+        display_date = timestamp
+        try:
+            from datetime import datetime as _dt
+            for fmt in ("%Y-%m-%dT%H:%M:%S.%fZ", "%Y-%m-%dT%H:%M:%SZ", "%Y-%m-%d"):
+                try:
+                    dt = _dt.strptime(timestamp[:26], fmt)
+                    display_date = dt.strftime("%B %-d, %Y")
+                    break
+                except ValueError:
+                    continue
+        except Exception:
+            pass
+
+        # Convert newlines to <br> in tweet text
+        tweet_html = tweet_text.replace("\n", "<br> ")
+
+        # Append embedded URL as link if present
+        if embedded_url:
+            tweet_html += f'<br> <a href="{embedded_url}">{embedded_url}</a>'
+
+        # Build twitter.com permalink with ref_src param
+        twitter_url = permalink.replace("https://x.com/", "https://twitter.com/")
+        if "?" not in twitter_url:
+            twitter_url += "?ref_src=twsrc%5Etfw"
+
         return (
-            f'<blockquote class="twitter-tweet" data-dnt="true">'
-            f'<p>{tweet_text[:280]}</p>'
-            f'&mdash; @{handler.replace("@", "")}'
-            f'<a href="{permalink}">{data.get("timestamp", "")}</a>'
+            f'<blockquote class="twitter-tweet">'
+            f'<p lang="en" dir="ltr">{tweet_html}</p>'
+            f'&mdash; {clean_handle} (@{clean_handle}) '
+            f'<a href="{twitter_url}">{display_date}</a>'
             f'</blockquote>'
-            f'<script async src="https://platform.twitter.com/widgets.js" charset="utf-8"></script>'
+            f' <script async src="https://platform.twitter.com/widgets.js" charset="utf-8"></script>'
         )
 
     elif source == "reddit" and permalink:
-        # Reddit oEmbed iframe
-        # Convert permalink to redditmedia embed URL
-        embed_url = permalink.replace("https://reddit.com", "https://www.redditmedia.com")
-        if "?" not in embed_url:
-            embed_url += "?ref_source=embed&ref=share&embed=true&theme=dark"
-        else:
-            embed_url += "&ref_source=embed&ref=share&embed=true&theme=dark"
+        # Official Reddit oEmbed blockquote format
+        post_title = data.get("post_title", data.get("tweet_text", ""))
+        # Extract subreddit from source_handle (e.g. "r/technology")
+        subreddit = data.get("source_handle", data.get("handler", ""))
+        if not subreddit.startswith("r/"):
+            subreddit = ""
+        subreddit_name = subreddit.replace("r/", "") if subreddit else ""
+        # Get the Reddit author username
+        author_name = data.get("reddit_author", data.get("author", ""))
+        # Ensure permalink uses www.reddit.com
+        reddit_permalink = permalink.replace("https://reddit.com", "https://www.reddit.com")
+        if not reddit_permalink.startswith("https://www.reddit.com"):
+            reddit_permalink = f"https://www.reddit.com{permalink}" if permalink.startswith("/") else permalink
+
         return (
-            f'<iframe id="reddit-embed" '
-            f'src="{embed_url}" '
-            f'sandbox="allow-scripts allow-same-origin allow-popups" '
-            f'style="border:none; width:100%; min-height:400px;" '
-            f'width="640" height="auto" scrolling="yes">'
-            f'</iframe>'
+            f'<blockquote class="reddit-embed-bq" style="height:500px" data-embed-height="240">\n'
+            f'<a href="{reddit_permalink}">{post_title}</a><br> by\n'
+            f'<a href="https://www.reddit.com/user/{author_name}/">u/{author_name}</a> in\n'
+            f'<a href="https://www.reddit.com/{subreddit}/">{subreddit_name}</a>\n'
+            f'</blockquote>'
+            f'<script async="" src="https://embed.reddit.com/widgets.js" charset="UTF-8"></script>'
         )
 
     # No embed possible — return empty
@@ -286,15 +323,13 @@ def main_publication2(data, types, key, website, image_ready=True):
     for i in ['"', "'",'*']:
         title_openAI = title_openAI.replace(i, "") if i in title_openAI else title_openAI
 
-    # ── Embed original post when image generation failed ──
-    source_embed = ""
-    if not image_ready:
-        source_embed = _build_source_embed(data)
-        if source_embed:
-            source_label = "X (Twitter)" if data.get("source") == "x" else "Reddit"
-            print(f"📌 Embedding original {source_label} post (image gen failed)")
-        else:
-            print(f"⚠️ Could not build embed for source={data.get('source')}")
+    # ── Always embed original social media post as source reference ──
+    source_embed = _build_source_embed(data)
+    if source_embed:
+        source_label = "X (Twitter)" if data.get("source") == "x" else "Reddit"
+        print(f"📌 Embedding original {source_label} post")
+    else:
+        print(f"⚠️ Could not build embed for source={data.get('source')}")
 
     # Construct HTML
     article_html = f"""
