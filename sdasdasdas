@@ -1,8 +1,60 @@
-# Firebase credentials for local development.
-# For Vercel deployment, add these to your project's Environment Variables settings.
-NEXT_PUBLIC_FIREBASE_API_KEY=AIzaSyAEJ2hp3wYEg_bi1rEDXhPhAWeTKZ7IkRg
-NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN=studio-8989670490-40b2b.firebaseapp.com
-NEXT_PUBLIC_FIREBASE_PROJECT_ID=studio-8989670490-40b2b
-NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID=902763051239
-NEXT_PUBLIC_FIREBASE_APP_ID=1:902763051239:web:4aff2f72e77528b50a4a42
-NEXT_PUBLIC_FIREBASE_MEASUREMENT_ID=
+Write a professional news article in Hindi (देवनागरी लिपि) based on the following social media post.
+
+Topic: {topic_niche}
+Source: {source} ({source_handle})
+Post Content: {tweet_text}
+
+Instructions:
+- Article must be written completely in Hindi
+- 300–500 words
+- Use a neutral, professional journalistic tone
+- Include a clear introduction, main body, and conclusion
+- Provide relevant background and context
+- Explain why the news is important
+- Clearly mention in the article that this information was shared by the person through a social media post (e.g., “इस व्यक्ति ने सोशल मीडिया पर पोस्ट करके यह जानकारी दी”)
+- Do NOT fabricate quotes, data, or facts
+- If details are limited, clearly mention that more information is still emerging
+- Avoid speculation
+
+
+
+
+
+
+
+
+???????????????????????????????????????????????/
+Write a professional news article in Hindi (देवनागरी लिपि) based on the following social media post.
+
+Topic: {topic_niche}
+Source: {source} ({source_handle})
+Post Content: {tweet_text}
+
+Instructions:
+- Article must be written completely in Hindi
+- 300–500 words
+- Use a neutral, professional journalistic tone
+- Include a clear introduction, main body, and conclusion
+- Provide relevant background and context
+- Explain why the news is important
+- Do NOT fabricate quotes, data, or facts
+- If details are limited, clearly mention that more information is still emerging
+- Avoid speculation
+
+
+??????????????????????????????????????????????
+Write a professional news article based on the following social media post.
+
+Topic: {topic_niche}
+Source: {source} ({source_handle})
+Post Content: {tweet_text}
+
+Requirements:
+- 300–500 words
+- Neutral, journalistic tone
+- Clear introduction, body, and conclusion
+- Provide context and background
+- Explain why the news is relevant
+- Do NOT fabricate quotes or facts
+- If information is limited, state that details are still emerging
+- Avoid speculation

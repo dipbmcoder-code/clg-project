@@ -30,6 +30,7 @@ export default function RHFSelect({
       render={({ field, fieldState: { error } }) => (
         <TextField
           {...field}
+          value={field.value ?? ''}
           select
           fullWidth
           SelectProps={{
@@ -104,37 +105,62 @@ export function RHFMultiSelect({
     <Controller
       name={name}
       control={control}
-      render={({ field, fieldState: { error } }) => (
-        <FormControl error={!!error} {...other}>
-          {label && <InputLabel id={name}> {label} </InputLabel>}
+      render={({ field, fieldState: { error } }) => {
+        const values = Array.isArray(field.value) ? field.value : [];
+        const renderValues = (selectedIds) => {
+          const ids = Array.isArray(selectedIds) ? selectedIds : [];
+          const selectedItems = options.filter((item) => ids.includes(item.value));
 
-          <Select
-            {...field}
-            multiple
-            displayEmpty={!!placeholder}
-            id={`multiple-${name}`}
-            labelId={name}
-            label={label}
-            renderValue={renderValues}
-          >
-            {options.map((option) => {
-              const selected = field.value.includes(option.value);
+          if (!selectedItems.length && placeholder) {
+            return <Box sx={{ color: 'text.disabled' }}>{placeholder}</Box>;
+          }
 
-              return (
-                <MenuItem key={option.value} value={option.value}>
-                  {checkbox && <Checkbox size="small" disableRipple checked={selected} />}
+          if (chip) {
+            return (
+              <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.5 }}>
+                {selectedItems.map((item) => (
+                  <Chip key={item.value} size="small" label={item.label} />
+                ))}
+              </Box>
+            );
+          }
 
-                  {option.label}
-                </MenuItem>
-              );
-            })}
-          </Select>
+          return selectedItems.map((item) => item.label).join(', ');
+        };
 
-          {(!!error || helperText) && (
-            <FormHelperText error={!!error}>{error ? error?.message : helperText}</FormHelperText>
-          )}
-        </FormControl>
-      )}
+        return (
+          <FormControl error={!!error} {...other}>
+            {label && <InputLabel id={name}> {label} </InputLabel>}
+
+            <Select
+              {...field}
+              multiple
+              displayEmpty={!!placeholder}
+              id={`multiple-${name}`}
+              labelId={name}
+              label={label}
+              renderValue={(v) => renderValues(Array.isArray(v) ? v : [])}
+              value={values}
+            >
+              {options.map((option) => {
+                const selected = values.includes(option.value);
+
+                return (
+                  <MenuItem key={option.value} value={option.value}>
+                    {checkbox && <Checkbox size="small" disableRipple checked={selected} />}
+
+                    {option.label}
+                  </MenuItem>
+                );
+              })}
+            </Select>
+
+            {(!!error || helperText) && (
+              <FormHelperText error={!!error}>{error ? error?.message : helperText}</FormHelperText>
+            )}
+          </FormControl>
+        );
+      }}
     />
   );
 }

@@ -13,7 +13,8 @@ class MessageStage(Enum):
     """Enum for different stages of the publication workflow."""
     RECORD_INSERTION = "record_insertion"
     IMAGE_GENERATION = "image_generation"
-    IMAGE_AWS_UPLOAD = "image_aws_upload"
+    IMAGE_LOCAL_SAVE = "image_local_save"
+    IMAGE_AWS_UPLOAD = "image_aws_upload"  # deprecated, kept for old log compat
     IMAGE_WORDPRESS_UPLOAD = "image_wordpress_upload"
     CONTENT_GENERATION = "content_generation"
     PUBLICATION = "publication"
@@ -93,7 +94,8 @@ def format_messages(key: str) -> str:
     stage_names = {
         "record_insertion": "1. Record Insertion",
         "image_generation": "2. Image Generation",
-        "image_aws_upload": "3. Image AWS Upload",
+        "image_local_save": "3. Image Local Save",
+        "image_aws_upload": "3. Image Upload (legacy)",
         "image_wordpress_upload": "4. Image WordPress Upload",
         "content_generation": "5. News Content Generation",
         "publication": "6. News Publication"

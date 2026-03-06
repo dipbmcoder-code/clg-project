@@ -54,4 +54,13 @@ export const endpoints = {
     authors: (websiteId) => `/api/wordpress/authors?website_id=${websiteId}`,
     publish: '/api/wordpress/publish',
   },
+  aiSettings: {
+    get: '/api/ai-settings',
+    update: '/api/ai-settings',
+  },
+  cron: {
+    settings: '/api/cron/settings',
+    trigger: '/api/cron/trigger',
+    history: '/api/cron/history',
+  },
 };

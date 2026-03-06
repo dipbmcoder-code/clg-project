@@ -1,15 +1,27 @@
 import requests
 import os
 import base64
-from auth.session_manager import session_manager
-from auth.auth_manager import auth_manager
 from datetime import datetime, timezone
 import time
 import unicodedata
 
+# Lazy imports for auth modules (may not exist in all environments)
+session_manager = None
+auth_manager = None
+
+def _ensure_auth():
+    global session_manager, auth_manager
+    if session_manager is None:
+        from auth.session_manager import session_manager as sm
+        session_manager = sm
+    if auth_manager is None:
+        from auth.auth_manager import auth_manager as am
+        auth_manager = am
+
 def fetch_websites_from_api():
     """Fetch websites from API (actual API call)"""
     try:
+        _ensure_auth()
         # Ensure we're authenticated
         if not auth_manager.ensure_authenticated():
             raise Exception("Failed to authenticate with CMS")
@@ -42,6 +54,7 @@ def fetch_websites_from_api():
 def fetch_news_prompts():
     """Fetch global news prompts from CMS Single Type"""
     try:
+        _ensure_auth()
         # Authentication is handled by session_manager, reused from fetch_websites
         if not auth_manager.ensure_authenticated():
             print("⚠️ Auth failed for news prompts")
@@ -113,7 +126,7 @@ def filter_websites_by_enable(websites, types):
     if types == 'player_profile':
         return [w for w in websites if w.get('enable_player_profiles')]
     if types == 'social_media':
-        return [w for w in websites if w.get('enable_social_media')]
+        return [w for w in websites if w.get('enable_x') or w.get('enable_reddit')]
     if types == 'preview':
         return [w for w in websites if w.get('enable_match_previews')]
     if types == 'review':
@@ -132,7 +145,7 @@ def check_enable_for(websites, types):
     if types == 'player_profile':
         return any(website.get('enable_player_profiles') for website in websites)
     if types == 'social_media':
-        return any(website.get('enable_social_media') for website in websites)
+        return any(website.get('enable_x') or website.get('enable_reddit') for website in websites)
     if types == 'preview':
         return any(website.get('enable_match_previews') for website in websites)
     if types == 'review':
@@ -219,7 +232,7 @@ def get_unique_field(websites, field_name):
             if field_name in site and site[field_name]:
                 values = site[field_name]
 
-                # If it's a list of dicts (like leagues/social_media_categories)
+                # If it's a list of dicts (like leagues/x_categories)
                 if isinstance(values, list) and all(isinstance(v, dict) for v in values):
                     for v in values:
                         if "shortName" in v:

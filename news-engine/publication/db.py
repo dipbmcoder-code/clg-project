@@ -1,12 +1,13 @@
 import psycopg2
 import psycopg2.extras
-from publication.config import db_name, host, password, user
+from publication.config import db_name, host, port, password, user
 
 def insert_db(insert_query, types=None):
     connection = None
     try:
         connection = psycopg2.connect ( 
             host= host,
+            port= port,
             user = user,
             password = password,
             database = db_name
@@ -51,6 +52,7 @@ def get_data(insert_query):
     try:
         connection = psycopg2.connect ( 
             host= host,
+            port= port,
             user = user,
             password = password,
             database = db_name
@@ -72,6 +74,7 @@ def get_data_one(query):
     try:
         connection = psycopg2.connect(
             host=host,
+            port=port,
             user=user,
             password=password,
             database=db_name

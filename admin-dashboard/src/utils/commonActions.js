@@ -40,6 +40,8 @@ const LIST_URLS = {
 const EDIT_URLS = {
   'users-website': (id) => `${HOST_API}${endpoints.websites.update(id)}`,
   'news-prompt': () => `${HOST_API}${endpoints.prompts.update}`,
+  'ai-settings': () => `${HOST_API}${endpoints.aiSettings.update}`,
+  'cron-settings': () => `${HOST_API}${endpoints.cron.settings}`,
   'users': (id) => `${HOST_API}${endpoints.users.update(id)}`,
 };
 
@@ -61,6 +63,8 @@ const ENTRY_URLS = {
 
 const SINGLE_TYPE_URLS = {
   'news-prompt': `${HOST_API}${endpoints.prompts.get}`,
+  'ai-settings': `${HOST_API}${endpoints.aiSettings.get}`,
+  'cron-settings': `${HOST_API}${endpoints.cron.settings}`,
 };
 
 /**

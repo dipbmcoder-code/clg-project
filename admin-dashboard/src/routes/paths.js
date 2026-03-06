@@ -21,6 +21,8 @@ export const paths = {
     news_prompts: `${ROOTS.ADMIN_DASHBOARD}/news_prompts`,
     logs: `${ROOTS.ADMIN_DASHBOARD}/news_logs`,
     users: `${ROOTS.ADMIN_DASHBOARD}/users`,
+    ai_settings: `${ROOTS.ADMIN_DASHBOARD}/ai_settings`,
+    cron: `${ROOTS.ADMIN_DASHBOARD}/cron`,
   },
   agent_dashboard: {
     root: ROOTS.AGENT_DASHBOARD,

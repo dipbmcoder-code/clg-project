@@ -1,0 +1,25 @@
+                                         Table "public.social_media_posts"
+    Column    |            Type             | Collation | Nullable |                    Default                     
+--------------+-----------------------------+-----------+----------+------------------------------------------------
+ id           | integer                     |           | not null | nextval('social_media_posts_id_seq'::regclass)
+ twitter_id   | character varying(255)      |           |          | 
+ handler      | character varying(255)      |           |          | 
+ tweet_text   | text                        |           |          | 
+ tweeted_time | timestamp without time zone |           |          | 
+ replies      | integer                     |           |          | 0
+ retweets     | integer                     |           |          | 0
+ likes        | integer                     |           |          | 0
+ embedded_url | text                        |           |          | 
+ images       | text                        |           |          | 
+ videos       | text                        |           |          | 
+ is_posted    | boolean                     |           |          | false
+ website_ids  | text                        |           |          | 
+ scraped_time | timestamp without time zone |           |          | CURRENT_TIMESTAMP
+ source       | character varying(20)       |           |          | 'x'::character varying
+ post_title   | text                        |           |          | 
+ score        | integer                     |           |          | 0
+ permalink    | text                        |           |          | 
+Indexes:
+    "social_media_posts_pkey" PRIMARY KEY, btree (id)
+    "social_media_posts_twitter_id_key" UNIQUE CONSTRAINT, btree (twitter_id)
+

@@ -34,7 +34,7 @@ MODULE_TO_CMS_FIELD = {
     'rumour': 'enable_transfer_rumors',
     'player_abroad': 'enabled_player_abroad',
     'player_profile': 'enable_player_profiles',
-    'social_media': 'enable_social_media',
+    'social_media': 'enable_x',
     'where_to_watch': 'enabled_where_to_watch',
 }
 

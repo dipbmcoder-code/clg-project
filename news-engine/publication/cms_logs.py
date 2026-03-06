@@ -5,8 +5,18 @@ from typing import Optional, Dict, Any, Union
 
 import requests
 
-from auth.auth_manager import auth_manager
-from auth.session_manager import session_manager
+# Lazy imports for auth modules (may not exist in all environments)
+session_manager = None
+auth_manager = None
+
+def _ensure_auth():
+    global session_manager, auth_manager
+    if session_manager is None:
+        from auth.session_manager import session_manager as sm
+        session_manager = sm
+    if auth_manager is None:
+        from auth.auth_manager import auth_manager as am
+        auth_manager = am
 
 
 CMS_NEWS_LOG_URL = (
@@ -45,6 +55,7 @@ def insert_news_log(
             print("⚠️ CMS_BASE_URL is not configured; cannot create news log.")
             return False
 
+        _ensure_auth()
         # if not auth_manager.ensure_authenticated():
         #     print("⚠️ Unable to authenticate with CMS; skipping news log creation.")
         #     return False

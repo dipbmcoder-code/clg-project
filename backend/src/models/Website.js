@@ -34,15 +34,15 @@ class Website {
         const columns = [
             'platform_name', 'platform_url', 'platform_user', 'platform_password',
             'active', 'is_validated', 'post_status', 'l_version', 'topic_niche',
-            'enable_social_media', 'twitter_handles', 'reddit_subreddits',
-            'social_media_categories', 'reddit_mode', 'reddit_categories',
+            'enable_x', 'twitter_handles', 'reddit_subreddits',
+            'x_categories', 'reddit_mode', 'reddit_categories',
             'reddit_min_score', 'enable_reddit', 'website_author'
         ];
 
         // Prepare values array based on columns
         const values = columns.map(col => {
             const val = data[col];
-            if (['twitter_handles', 'reddit_subreddits', 'social_media_categories', 'reddit_categories', 'website_author'].includes(col)) {
+            if (['twitter_handles', 'reddit_subreddits', 'x_categories', 'reddit_categories', 'website_author'].includes(col)) {
                 return JSON.stringify(val || (col === 'website_author' ? {} : []));
             }
             if (col === 'active') return val ?? true;
@@ -50,7 +50,7 @@ class Website {
             if (col === 'post_status') return val || 'draft';
             if (col === 'l_version') return val || 'eng';
             if (col === 'topic_niche') return val || 'general';
-            if (col === 'enable_social_media') return val ?? false;
+            if (col === 'enable_x') return val ?? false;
             if (col === 'enable_reddit') return val ?? false;
             if (col === 'reddit_mode') return val || 'hot';
             if (col === 'reddit_min_score') return val ?? 0;
@@ -73,7 +73,7 @@ class Website {
             fields.push(`${key} = $${idx++}`);
 
             // Handle JSON stringification if needed
-            if (['twitter_handles', 'reddit_subreddits', 'social_media_categories', 'reddit_categories', 'website_author'].includes(key) && typeof value !== 'string') {
+            if (['twitter_handles', 'reddit_subreddits', 'x_categories', 'reddit_categories', 'website_author'].includes(key) && typeof value !== 'string') {
                 values.push(JSON.stringify(value));
             } else {
                 values.push(value);

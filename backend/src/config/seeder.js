@@ -55,6 +55,47 @@ async function seedDefaults() {
       }
     }
 
+    // Seed default AI settings
+    try {
+      const { rows: aiRows } = await client.query('SELECT COUNT(*)::int AS count FROM ai_settings');
+      if (aiRows[0].count === 0) {
+        await client.query(`
+          INSERT INTO ai_settings (
+            content_provider, content_model, content_temperature, content_max_tokens,
+            image_provider, aws_region
+          ) VALUES (
+            'openai', 'gpt-4o-mini', 0.7, 2000,
+            'gemini-flash-image', 'us-east-1'
+          )
+        `);
+        logger.info('✅ Default AI settings seeded');
+      }
+    } catch (err) {
+      if (err.code === '42P01') {
+        logger.warn('⚠️ ai_settings table does not exist. Skipping seed.');
+      } else {
+        throw err;
+      }
+    }
+
+    // Seed default cron settings
+    try {
+      const { rows: cronRows } = await client.query('SELECT COUNT(*)::int AS count FROM cron_settings');
+      if (cronRows[0].count === 0) {
+        await client.query(`
+          INSERT INTO cron_settings (cron_enabled, cron_interval_minutes)
+          VALUES (true, 60)
+        `);
+        logger.info('✅ Default cron settings seeded');
+      }
+    } catch (err) {
+      if (err.code === '42P01') {
+        logger.warn('⚠️ cron_settings table does not exist. Skipping seed.');
+      } else {
+        throw err;
+      }
+    }
+
   } catch (err) {
     logger.error('⚠️ Seed error: ' + err.message);
   } finally {

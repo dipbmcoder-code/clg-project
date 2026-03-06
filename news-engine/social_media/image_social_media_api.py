@@ -30,6 +30,7 @@ def generate_post_image(post_data, key, l_version, types, website=None):
         custom_prompt = website.get("social_media_news_image_prompt")
 
     if custom_prompt:
+        print(f"📝 Using custom image prompt from DB")
         prompt_vars = {
             "tweet_text": post_text,
             "post_title": post_title,
@@ -65,8 +66,4 @@ def generate_post_image(post_data, key, l_version, types, website=None):
         """
 
     generate_gemini_image(prompt, key, l_version, types)
-
-
-# Keep backward compatibility alias
-generate_tweet_image = generate_post_image
 

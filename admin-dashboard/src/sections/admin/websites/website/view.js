@@ -24,6 +24,7 @@ import RedditIcon from '@mui/icons-material/Reddit';
 import HomeIcon from '@mui/icons-material/Home';
 import VerifiedIcon from '@mui/icons-material/Verified';
 import SyncIcon from '@mui/icons-material/Sync';
+import XIcon from '@mui/icons-material/X';
 
 import { useSettingsContext } from 'src/components/settings';
 import { useRouter, usePathname } from 'src/routes/hooks';
@@ -134,7 +135,7 @@ function Website({
 
   const memoizedData = useMemo(() => ({ ...data }), [data]);
 
-  const sections = [
+  const sections = useMemo(() => [
     {
       id: 'general',
       title: 'General Settings',
@@ -175,14 +176,14 @@ function Website({
       ],
     },
     {
-      id: 'social_media',
-      title: 'Social Media Scraping',
-      icon: <ShareIcon sx={{ fontSize: 20 }} />,
+      id: 'x_scraping',
+      title: 'X (Twitter) Scraping',
+      icon: <XIcon sx={{ fontSize: 20 }} />,
       fields: [
         {
-          name: 'enable_social_media',
+          name: 'enable_x',
           type: 'boolean',
-          label: 'Enable Social Media Scraping',
+          label: 'Enable X (Twitter) Scraping',
           props: { xs: 12 },
         },
         {
@@ -193,7 +194,7 @@ function Website({
           props: { xs: 6 },
         },
         {
-          name: 'social_media_categories',
+          name: 'x_categories',
           limit: 5,
           type: 'free_text_multiple',
           label: 'WordPress Categories',
@@ -252,7 +253,7 @@ function Website({
         },
       ],
     },
-  ];
+  ], [isValidated, wpAuthors, wpCategories, data]);
 
   return (
     <Container maxWidth={settings.themeStretch ? false : 'xl'}>

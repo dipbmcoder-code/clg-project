@@ -144,182 +144,46 @@ def generate_openRouter_image(prompt, id, l_version, types):
 
 def generate_gemini_image(prompt, id, l_version, types):
     
-    if os.getenv("IMAGE_GENERATE_SERVICE") == 'openrouter':
+    service = os.getenv("IMAGE_GENERATE_SERVICE", "")
+    
+    if service == 'skip' or service == 'none':
+        print("⏭️ Image generation skipped (IMAGE_GENERATE_SERVICE=skip)")
+        from publication.message_tracker import add_message, MessageStage, MessageStatus
+        add_message(types, MessageStage.IMAGE_GENERATION, MessageStatus.SUCCESS, "Image generation skipped")
+        return
+    elif service == 'openrouter':
         generate_openRouter_image(prompt, id, l_version, types)
-    elif os.getenv("IMAGE_GENERATE_SERVICE") == 'imagen':
+    elif service == 'imagen':
         generate_imagen_image(prompt, id, l_version, types)
-    elif os.getenv("IMAGE_GENERATE_SERVICE") == 'gemini-flash-image':
+    elif service == 'gemini-flash-image':
         generate_gemini_flash_image(prompt, id, l_version, types)
     else:
-        print("called gemini image generation")
-        
-        image_generated = False
-        error_message = None
-        max_retries = 2
-        retry_delay = 3  # seconds
-        
-        headers = {
-            'Content-Type': 'application/json',
-        }
-        params = {
-            'key': os.getenv("GOOGLE_GEMINI_API_KEY")
-        }
-        data = {
-            "contents": [{
-                "parts": [{
-                    "text": prompt
-                }]
-            }],
-            "generationConfig": {
-                "responseModalities": ["TEXT", "IMAGE"],  # Request both text and image
-            }
-        }
-        
-        try:
-            for attempt in range(1, max_retries + 1):
-                try:
-                    print(f"[INFO] Gemini image generation attempt {attempt}/{max_retries}")
-                    
-                    # Generate image with Gemini
-                    response = requests.post(
-                        f"https://generativelanguage.googleapis.com/v1beta/models/{os.getenv('GOOGLE_GEMINI_MODEL')}:generateContent",
-                        headers=headers,
-                        params=params,
-                        json=data,
-                        timeout=30
-                    )
-                    
-                    print(f"[INFO] Response status code: {response.status_code}")
-                    
-                    # --- Save Full Response Log ---
-                    log_path = root_folder / "result" / "img_match" / f"{l_version}_{id}_{types}_response.json"
-                    
-                    if response.status_code == 200:
-                        result = response.json()
-
-                        # Get image bytes from Gemini response
-                        if 'candidates' in result and result['candidates']:
-                            candidate = result['candidates'][0]
-                            if 'content' in candidate and 'parts' in candidate['content']:
-                                for part in candidate['content']['parts']:
-                                    if 'inlineData' in part:
-                                        image_data = part['inlineData']['data']
-                                        image_bytes = base64.b64decode(image_data)
-                                        output_path = root_folder / 'result' / 'img_match' / f'{l_version}_{id}_{types}.png'
-                                        with open(output_path, 'wb') as f:
-                                            f.write(image_bytes)
-                                        sleep(2)
-                                        image_generated = True
-                                        print(f"[INFO] Gemini image generated successfully on attempt {attempt}")
-                                        break
-
-                                    elif 'text' in part and part['text'].startswith('data:image'):
-                                        image_data = part['text'].split(",")[1]
-                                        image_bytes = base64.b64decode(image_data)
-                                        output_path = root_folder / 'result' / 'img_match' / f'{l_version}_{id}_{types}.png'
-                                        with open(output_path, 'wb') as f:
-                                            f.write(image_bytes)
-                                        sleep(3)
-                                        image_generated = True
-                                        print(f"[INFO] Gemini image generated successfully on attempt {attempt}")
-                                        break
-                                
-                                if image_generated:
-                                    break  # Success, exit retry loop
-                                else:
-                                    # Save response for debugging
-                                    with open(log_path, "w") as f:
-                                        json.dump(result, f, indent=2, default=str)
-                                    print(f"[INFO] Response saved to {log_path}")
-                                    raise Exception("No valid image data found in part (neither 'inlineData' nor 'text' with data:image)")
-                            else:
-                                # Save response for debugging
-                                with open(log_path, "w") as f:
-                                    json.dump(result, f, indent=2, default=str)
-                                print(f"[INFO] Response saved to {log_path}")
-                                raise Exception("No 'content' or 'parts' found in candidate from Gemini response")
-                        else:
-                            # Save response for debugging
-                            with open(log_path, "w") as f:
-                                json.dump(result, f, indent=2, default=str)
-                            print(f"[INFO] Response saved to {log_path}")
-                            raise Exception("No 'candidates' found in Gemini response or candidates list is empty")
-                    else:
-                        # Capture error details from response
-                        try:
-                            error_response = response.json()
-                            error_details = error_response.get('error', {})
-                            error_code = error_details.get('code', response.status_code)
-                            error_msg = error_details.get('message', 'Unknown error')
-                            error_status = error_details.get('status', 'UNKNOWN')
-                            
-                            # Save error response for debugging
-                            with open(log_path, "w") as f:
-                                json.dump(error_response, f, indent=2, default=str)
-                            print(f"[INFO] Error response saved to {log_path}")
-                            
-                            raise Exception(f"Gemini API error [{error_code}] {error_status}: {error_msg}")
-                        except json.JSONDecodeError:
-                            raise Exception(f"HTTP {response.status_code}: {response.text[:200]}")
-                
-                except Exception as e:
-                    error_message = f"Gemini Image Error (attempt {attempt}/{max_retries}): {str(e)}"
-                    print(error_message)
-                    
-                    # Check for quota errors
-                    error_str = str(e)
-                    if "429" in error_str or "402" in error_str or "Resource has been exhausted" in error_str or "Quota exceeded" in error_str or "RESOURCE_EXHAUSTED" in error_str:
-                        print(f"🚨 CRITICAL: Gemini API Quota Exceeded!")
-                        send_quota_alert_email(f"Gemini API Quota Exceeded: {error_str}")
-                        break
-                    
-                    # Check if this is a retryable error
-                    is_retryable = ("No valid image data found" in error_str or 
-                                  "No 'content' or 'parts' found" in error_str or
-                                  "No 'candidates' found" in error_str or
-                                  "timeout" in error_str.lower())
-                    
-                    if is_retryable and attempt < max_retries:
-                        print(f"[INFO] Retrying in {retry_delay} seconds...")
-                        sleep(retry_delay)
-                    else:
-                        # Either not retryable or max retries reached
-                        if attempt == max_retries:
-                            error_message = f"Gemini Image Error: Failed after {max_retries} attempts - {str(e)}"
-                            print(f"[ERROR] {error_message}")
-                        break
-
-        except Exception as _ex:
-            error_message = f"Error during calling gemini: {_ex}"
-            print(f" {error_message}")
-        finally:
-            from publication.message_tracker import add_message, MessageStage, MessageStatus
-            add_message(
-                types,
-                MessageStage.IMAGE_GENERATION,
-                MessageStatus.SUCCESS if image_generated else MessageStatus.ERROR,
-                "Image generated successfully" if image_generated else "Image generation failed",
-                error_details=error_message
-            )
+        print(f"⚠️ Unknown IMAGE_GENERATE_SERVICE: '{service}', defaulting to gemini-flash-image")
+        generate_gemini_flash_image(prompt, id, l_version, types)
 
 def check_data_exists_in_db(data, id, field_name):
     return any(item[field_name] == id for item in data)
 
 def check_is_posted(data, website_id):
     website_ids = data.get("website_ids")
+    if isinstance(website_ids, str):
+        try:
+            website_ids = json.loads(website_ids)
+        except (json.JSONDecodeError, TypeError):
+            website_ids = []
     return (
         data.get("is_posted") is True and
         isinstance(website_ids, list) and
-        website_id in website_ids
+        str(website_id) in [str(w) for w in website_ids]
     )
 
 def update_post_in_db(id, table_name, websiteIds):
-    website_ids = f"'{json.dumps(websiteIds)}'::jsonb"
+    website_ids_json = json.dumps([str(w) for w in websiteIds])
     update_query = (
         f"UPDATE {table_name} "
         f"SET is_posted = TRUE, "
         f"posted_datetime = NOW(), "
-        f"website_ids = {website_ids} "
+        f"website_ids = '{website_ids_json}'::jsonb "
         f"WHERE id = {id} ;"
     )
     insert_db(update_query)
@@ -355,31 +219,91 @@ def generate_openai_content(prompt, key=None):
     error_message = None
     content = None
     try:
-        if os.getenv("CONTENT_GENERATE_SERVICE") == 'openrouter':
+        service = os.getenv("CONTENT_GENERATE_SERVICE", "openai")
+
+        if service == 'gemini':
+            # Use Gemini SDK directly for content generation with key rotation
+            gemini_keys_str = os.getenv("GOOGLE_GEMINI_API_KEYS", "")
+            primary_key = os.getenv("GOOGLE_GEMINI_API_KEY", "")
+            # Build list of keys: primary + extras from GOOGLE_GEMINI_API_KEYS (comma-separated)
+            all_keys = [primary_key] if primary_key else []
+            if gemini_keys_str:
+                for k in gemini_keys_str.split(","):
+                    k = k.strip()
+                    if k and k not in all_keys:
+                        all_keys.append(k)
+            if not all_keys:
+                raise Exception("No Gemini API keys configured")
+
+            gemini_model = os.getenv("GOOGLE_GEMINI_CONTENT_MODEL", "gemini-2.0-flash")
+            last_error = None
+            for key_idx, api_key in enumerate(all_keys):
+                gemini_client = genai.Client(api_key=api_key)
+                max_retries = 2
+                for attempt in range(1, max_retries + 1):
+                    try:
+                        response = gemini_client.models.generate_content(
+                            model=gemini_model,
+                            contents=prompt,
+                        )
+                        content = response.text
+                        content_generated = True
+                        break
+                    except Exception as gemini_err:
+                        last_error = gemini_err
+                        err_str = str(gemini_err)
+                        if '429' in err_str and attempt < max_retries:
+                            wait_time = 10 * attempt
+                            print(f"⏳ Gemini rate limited (key {key_idx+1}), waiting {wait_time}s (attempt {attempt}/{max_retries})...")
+                            sleep(wait_time)
+                        elif '429' in err_str and key_idx < len(all_keys) - 1:
+                            print(f"⏳ Key {key_idx+1} exhausted, trying next key...")
+                            break  # try next key
+                        else:
+                            raise gemini_err
+                if content_generated:
+                    break
+            if not content_generated and last_error:
+                raise last_error
+        elif service == 'openrouter':
             client = OpenAI(
                 base_url="https://openrouter.ai/api/v1",
                 api_key=os.getenv("OPEN_ROUTER_API_KEY"),
             )
+            model = os.getenv("OPEN_ROUTER_CONTENT_MODEL", "openrouter/free")
+            response = client.chat.completions.create(
+                model=model,
+                messages=[
+                    {"role": "system", "content": "You are a helpful assistant."},
+                    {"role": "user", "content": prompt}
+                ],
+                temperature=1,
+                max_completion_tokens=2000,
+                top_p=1,
+                frequency_penalty=0,
+                presence_penalty=0
+            )
+            content = response.choices[0].message.content
+            content_generated = True
         else:
+            # Default: OpenAI
             client = openai
             openai.api_key = os.getenv('OPENAI_API_KEY')
-
-
-        response = client.chat.completions.create(
-            model=os.getenv('OPENAI_MODEL'),
-            messages=[
-                {"role": "system", "content": "You are a helpful assistant."},
-                {"role": "user", "content": prompt}
-            ],
-            # extra_body={"reasoning": {"enabled": True}},
-            temperature=1,
-            max_completion_tokens=2000,
-            top_p=1,
-            frequency_penalty=0,
-            presence_penalty=0
-        )
-        content = response.choices[0].message.content
-        content_generated = True
+            model = os.getenv('OPENAI_MODEL')
+            response = client.chat.completions.create(
+                model=model,
+                messages=[
+                    {"role": "system", "content": "You are a helpful assistant."},
+                    {"role": "user", "content": prompt}
+                ],
+                temperature=1,
+                max_completion_tokens=2000,
+                top_p=1,
+                frequency_penalty=0,
+                presence_penalty=0
+            )
+            content = response.choices[0].message.content
+            content_generated = True
 
     except Exception as _ex:
         error_message = f"Error: {_ex}"
@@ -431,21 +355,6 @@ def check_image_exists(lang, types, id):
     img_path = root_folder / f'result/img_match/{lang}_{id}_{types}.png'
     return os.path.exists(img_path)
 
-def download_aws_image(lang, types, id):
-    try :
-        img_path = root_folder / f'result/img_match/{lang}_{id}_{types}.png'
-        aws_image_url = f"{os.getenv('AWS_URL')}/match/{lang}_{id}_{types}.png"
-        response = requests.get(aws_image_url, stream=True)
-        response.raise_for_status()
-
-        # Save locally
-        with open(img_path, "wb") as f:
-            for chunk in response.iter_content(1024):
-                f.write(chunk)
-            return "done"
-    except Exception as _ex:
-        print("[Error] while downloading image from aws")
-
 def parse_date(value):
     if isinstance(value, date):
         return value
@@ -453,119 +362,6 @@ def parse_date(value):
         return datetime.strptime(value, "%Y-%m-%d").date()
     except (TypeError, ValueError):
         return None  # in case of bad or missing data
-
-def check_api_quota():
-    """
-    Check if API quota is available.
-    Tries billing API first, falls back to minimal test call.
-    
-    Returns:
-        tuple: (is_available: bool, error_message: str)
-    """
-    print("🔍 Checking API quota availability...")
-    
-    # Determine which service to use
-    service = os.getenv("CONTENT_GENERATE_SERVICE", "openai")
-    
-    # --- Strategy 1: Billing API Check (Preferred) ---
-    try:
-        if service == 'openai':
-            api_key = os.getenv('OPENAI_API_KEY')
-            if api_key:
-                headers = {"Authorization": f"Bearer {api_key}"}
-                # Note: This endpoint is internal/undocumented and may change or require session keys
-                billing_url = "https://api.openai.com/v1/dashboard/billing/credit_grants"
-                response = requests.get(billing_url, headers=headers, timeout=5)
-                
-                if response.status_code == 200:
-                    data = response.json()
-                    total_granted = data.get("total_granted", 0)
-                    total_used = data.get("total_used", 0)
-                    available = total_granted - total_used
-                    
-                    if available <= 0:
-                        error_msg = f"Billing API: Quota exhausted (Available: {available})"
-                        print(f"❌ {error_msg}")
-                        return (False, error_msg)
-                    
-                    print(f"✅ Billing API check passed (Available credits: {available})")
-                    return (True, None)
-                elif response.status_code == 401:
-                    print("⚠️ Billing API unauthorized (key may not support billing access). Falling back.")
-                else:
-                    print(f"⚠️ Billing API returned {response.status_code}. Falling back.")
-        
-        elif service == 'openrouter':
-            api_key = os.getenv("OPEN_ROUTER_API_KEY")
-            if api_key:
-                headers = {"Authorization": f"Bearer {api_key}"}
-                credits_url = "https://openrouter.ai/api/v1/credits"
-                response = requests.get(credits_url, headers=headers, timeout=5)
-                
-                if response.status_code == 200:
-                    data = response.json()
-                    data_obj = data.get("data", {})
-                    total_credits = data_obj.get("total_credits", 0)
-                    total_usage = data_obj.get("total_usage", 0)
-                    # OpenRouter logic might differ, assuming if credits > usage or positive balance
-                    # Actually OpenRouter usually returns 'total_credits' as remaining balance or similar
-                    # Let's assume if response is 200, we are good unless explicit error
-                    print(f"✅ OpenRouter Credits API check passed")
-                    return (True, None)
-                
-    except Exception as e:
-        print(f"⚠️ Billing API check failed: {e}. Falling back to generation check.")
-
-    # --- Strategy 2: Minimal Generation Check (Fallback) ---
-    try:
-        if service == 'openrouter':
-            client = OpenAI(
-                base_url="https://openrouter.ai/api/v1",
-                api_key=os.getenv("OPEN_ROUTER_API_KEY"),
-            )
-        else:
-            client = openai
-            openai.api_key = os.getenv('OPENAI_API_KEY')
-        
-        # Make a minimal test call (single token response)
-        response = client.chat.completions.create(
-            model=os.getenv('OPENAI_MODEL'),
-            messages=[
-                {"role": "user", "content": "Hi"}
-            ],
-            max_completion_tokens=1,
-            temperature=0
-        )
-        
-        print("✅ Generation check passed - quota available")
-        return (True, None)
-        
-    except Exception as e:
-        error_str = str(e).lower()
-        status_code = None
-        
-        # Try to extract status code
-        if hasattr(e, 'status_code'):
-            status_code = e.status_code
-        elif hasattr(e, 'response') and hasattr(e.response, 'status_code'):
-            status_code = e.response.status_code
-        elif hasattr(e, 'code'):
-            try:
-                status_code = int(e.code)
-            except (ValueError, TypeError):
-                pass
-        
-        # Check for quota/payment errors
-        if status_code in [402, 429] or '402' in error_str or '429' in error_str or \
-           'payment required' in error_str or 'rate limit' in error_str or 'quota' in error_str:
-            error_type = "Payment Required" if (status_code == 402 or '402' in error_str or 'payment' in error_str) else "Rate Limit Exceeded"
-            error_message = f"API {error_type} (Status: {status_code or 'Unknown'}): {str(e)}"
-            print(f"❌ API quota check failed: {error_message}")
-            return (False, error_message)
-        
-        # Other errors - assume quota is available but something else is wrong
-        print(f"⚠️ API quota check encountered error (assuming quota available): {str(e)}")
-        return (True, None)
 
 def _send_email_thread(error_message, email_from, email_to, sendgrid_api_key):
     """Internal function to run email sending in a thread."""
@@ -791,12 +587,18 @@ def generate_imagen_image(prompt, id, l_version, types):
             error_details=None if image_generated else error_message,
         )
 
-def generate_gemini_flash_image(prompt, id, l_version, types):
+def generate_gemini_flash_image(prompt, id, l_version, types, root_folder):
     """
-    Generate image using Gemini 2.5 Flash Image model via Google GenAI SDK.
-    Based on the new generate_content API with image generation capabilities.
+    Generate image using Gemini 3.1 Flash Image Preview (Nano Banana 2) via Google GenAI SDK.
     """
-    print("called Gemini 2.5 Flash Image via Google GenAI SDK")
+    print("Called Gemini 3.1 Flash Image Preview (Nano Banana 2) via Google GenAI SDK")
+
+    # Ensure root_folder is a Path object to avoid TypeError
+    root_folder = Path(root_folder)
+    output_dir = root_folder / "result" / "img_match"
+    
+    # 1. FIX: Ensure the output directory exists to prevent FileNotFoundError
+    output_dir.mkdir(parents=True, exist_ok=True)
 
     image_generated = False
     error_message = None
@@ -808,38 +610,48 @@ def generate_gemini_flash_image(prompt, id, l_version, types):
             try:
                 print(f"[INFO] Gemini Flash Image generation attempt {attempt}/{max_retries}")
                 
-                api_key = os.getenv("GOOGLE_API_KEY") or os.getenv("GOOGLE_GEMINI_API_KEY")
+                api_key = os.getenv("GOOGLE_GEMINI_API_KEY")
                 if not api_key:
-                    raise Exception("No Google API key found (checked GOOGLE_API_KEY and GOOGLE_GEMINI_API_KEY)")
+                    raise Exception("No GOOGLE_GEMINI_API_KEY found in environment")
                     
                 client = genai.Client(api_key=api_key)
                 
-                # Use gemini-2.5-flash-image model
-                model = os.getenv("GOOGLE_GEMINI_MODEL") or "gemini-2.5-flash-image"
+                # 2. FIX: Hardcode or validate the model name to prevent text-only model fallbacks
+                model = os.getenv("GOOGLE_GEMINI_IMAGE_MODEL") or "gemini-3.1-flash-image-preview"
                 
                 response = client.models.generate_content(
                     model=model,
-                    contents=[prompt]
+                    contents=[prompt],
+                    config=genai_types.GenerateContentConfig(
+                        # 3. FIX: Strictly enforce IMAGE output so it doesn't default to text
+                        response_modalities=["IMAGE"],
+                        image_config=genai_types.ImageConfig(
+                            aspect_ratio="16:9",
+                            image_size="1K",
+                        ),
+                    ),
                 )
                 
-                # --- Save Full Response Log ---
-                log_path = root_folder / "result" / "img_match" / f"{l_version}_{id}_{types}_response.json"
+                log_path = output_dir / f"{l_version}_{id}_{types}_response.json"
 
                 if not hasattr(response, 'parts') or not response.parts:
                     with open(log_path, "w") as f:
-                        json.dump({"error": response}, f, indent=2, default=str)
-                    print(f"[INFO] Response saved to {log_path}")
+                        json.dump({"error": str(response)}, f, indent=2, default=str)
                     raise Exception("No parts returned from Gemini Flash Image.")
 
-                # Iterate through parts to find image
                 image_found = False
                 for part in response.parts:
-                    if part.text is not None:
-                        print(f"[INFO] Text response: {part.text}")
-                    elif part.inline_data is not None:
-                        # Found image data
+                    # Skip thinking/thought parts if present
+                    if hasattr(part, 'thought') and part.thought:
+                        continue
+                        
+                    if part.text:
+                        print(f"[INFO] Text response: {part.text[:200]}")
+                        
+                    elif part.inline_data:
+                        # Ensure you have 'pillow' installed (pip install pillow) for as_image()
                         image = part.as_image()
-                        output_path = root_folder / "result" / "img_match" / f"{l_version}_{id}_{types}.png"
+                        output_path = output_dir / f"{l_version}_{id}_{types}.png"
                         image.save(str(output_path))
                         
                         sleep(2)
@@ -849,45 +661,46 @@ def generate_gemini_flash_image(prompt, id, l_version, types):
                         break
                 
                 if image_found:
-                    break  # Success, exit retry loop
+                    break 
                 else:
                     with open(log_path, "w") as f:
-                        json.dump({"error": response}, f, indent=2, default=str)
-                    print(f"[INFO] Response saved to {log_path}")
+                        json.dump({"error": "No inline_data found in response"}, f, indent=2)
                     raise Exception("No image data found in response parts.")
 
             except Exception as e:
                 error_message = f"Gemini Flash Image Error (attempt {attempt}/{max_retries}): {str(e)}"
                 print(error_message)
                 
-                # Check for quota errors
                 error_str = str(e)
-                if "429" in error_str or "402" in error_str or "Resource has been exhausted" in error_str or "Quota exceeded" in error_str or "RESOURCE_EXHAUSTED" in error_str:
+                if any(err in error_str for err in ["429", "402", "Resource has been exhausted", "Quota exceeded", "RESOURCE_EXHAUSTED"]):
                     print(f"🚨 CRITICAL: Gemini Flash Image API Quota Exceeded!")
-                    send_quota_alert_email(f"Gemini Flash Image API Quota Exceeded: {error_str}")
+                    # send_quota_alert_email(f"Gemini Flash Image API Quota Exceeded: {error_str}")
                     break
 
-                # Check if this is a retryable error
-                is_retryable = ("No parts returned from Gemini Flash Image" in error_str or 
-                              "No image data found in response parts" in error_str or
-                              "timeout" in error_str.lower())
+                # 4. FIX: Broader retry condition to catch intermittent API drops
+                is_retryable = (
+                    "No parts returned" in error_str or 
+                    "No image data found" in error_str or
+                    "timeout" in error_str.lower() or
+                    "503" in error_str or
+                    "500" in error_str
+                )
                 
                 if is_retryable and attempt < max_retries:
                     print(f"[INFO] Retrying in {retry_delay} seconds...")
                     sleep(retry_delay)
                 else:
-                    # Either not retryable or max retries reached
                     if attempt == max_retries:
-                        error_message = f"Gemini Flash Image Error: Failed after {max_retries} attempts - {str(e)}"
-                        print(f"[ERROR] {error_message}")
+                        print(f"[ERROR] Failed after {max_retries} attempts - {str(e)}")
                     break
 
     finally:
+        # Assuming your tracker is properly imported
         from publication.message_tracker import add_message, MessageStage, MessageStatus
         add_message(
             types,
             MessageStage.IMAGE_GENERATION,
             MessageStatus.SUCCESS if image_generated else MessageStatus.ERROR,
-            "Image generated successfully using Gemini 2.5 Flash Image" if image_generated else "Image generation failed",
+            "Image generated successfully" if image_generated else f"Image generation failed: {error_message}",
             error_details=None if image_generated else error_message,
         )
