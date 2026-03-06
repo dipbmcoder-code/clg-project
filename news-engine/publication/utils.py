@@ -587,13 +587,18 @@ def generate_imagen_image(prompt, id, l_version, types):
             error_details=None if image_generated else error_message,
         )
 
-def generate_gemini_flash_image(prompt, id, l_version, types):
+def generate_gemini_flash_image(prompt, id, l_version, types, root_folder):
     """
     Generate image using Gemini 3.1 Flash Image Preview (Nano Banana 2) via Google GenAI SDK.
-    Uses the latest generate_content API with response_modalities and image_config.
-    Ref: https://ai.google.dev/gemini-api/docs/image-generation
     """
-    print("called Gemini 3.1 Flash Image Preview (Nano Banana 2) via Google GenAI SDK")
+    print("Called Gemini 3.1 Flash Image Preview (Nano Banana 2) via Google GenAI SDK")
+
+    # Ensure root_folder is a Path object to avoid TypeError
+    root_folder = Path(root_folder)
+    output_dir = root_folder / "result" / "img_match"
+    
+    # 1. FIX: Ensure the output directory exists to prevent FileNotFoundError
+    output_dir.mkdir(parents=True, exist_ok=True)
 
     image_generated = False
     error_message = None
@@ -611,14 +616,15 @@ def generate_gemini_flash_image(prompt, id, l_version, types):
                     
                 client = genai.Client(api_key=api_key)
                 
-                # Use gemini-3.1-flash-image-preview (Nano Banana 2) — latest model
-                model = os.getenv("GOOGLE_GEMINI_MODEL") or "gemini-3.1-flash-image-preview"
+                # 2. FIX: Hardcode or validate the model name to prevent text-only model fallbacks
+                model = os.getenv("GOOGLE_GEMINI_IMAGE_MODEL") or "gemini-3.1-flash-image-preview"
                 
                 response = client.models.generate_content(
                     model=model,
                     contents=[prompt],
                     config=genai_types.GenerateContentConfig(
-                        response_modalities=['TEXT', 'IMAGE'],
+                        # 3. FIX: Strictly enforce IMAGE output so it doesn't default to text
+                        response_modalities=["IMAGE"],
                         image_config=genai_types.ImageConfig(
                             aspect_ratio="16:9",
                             image_size="1K",
@@ -626,27 +632,26 @@ def generate_gemini_flash_image(prompt, id, l_version, types):
                     ),
                 )
                 
-                # --- Save Full Response Log ---
-                log_path = root_folder / "result" / "img_match" / f"{l_version}_{id}_{types}_response.json"
+                log_path = output_dir / f"{l_version}_{id}_{types}_response.json"
 
                 if not hasattr(response, 'parts') or not response.parts:
                     with open(log_path, "w") as f:
                         json.dump({"error": str(response)}, f, indent=2, default=str)
-                    print(f"[INFO] Response saved to {log_path}")
                     raise Exception("No parts returned from Gemini Flash Image.")
 
-                # Iterate through parts — skip thought parts, find image
                 image_found = False
                 for part in response.parts:
-                    # Skip thinking/thought parts (Gemini 3 models use thinking by default)
+                    # Skip thinking/thought parts if present
                     if hasattr(part, 'thought') and part.thought:
                         continue
-                    if part.text is not None:
-                        print(f"[INFO] Text response: {part.text[:200] if part.text else ''}")
-                    elif part.inline_data is not None:
-                        # Found image data — save using SDK helper
+                        
+                    if part.text:
+                        print(f"[INFO] Text response: {part.text[:200]}")
+                        
+                    elif part.inline_data:
+                        # Ensure you have 'pillow' installed (pip install pillow) for as_image()
                         image = part.as_image()
-                        output_path = root_folder / "result" / "img_match" / f"{l_version}_{id}_{types}.png"
+                        output_path = output_dir / f"{l_version}_{id}_{types}.png"
                         image.save(str(output_path))
                         
                         sleep(2)
@@ -656,45 +661,46 @@ def generate_gemini_flash_image(prompt, id, l_version, types):
                         break
                 
                 if image_found:
-                    break  # Success, exit retry loop
+                    break 
                 else:
                     with open(log_path, "w") as f:
-                        json.dump({"error": str(response)}, f, indent=2, default=str)
-                    print(f"[INFO] Response saved to {log_path}")
+                        json.dump({"error": "No inline_data found in response"}, f, indent=2)
                     raise Exception("No image data found in response parts.")
 
             except Exception as e:
                 error_message = f"Gemini Flash Image Error (attempt {attempt}/{max_retries}): {str(e)}"
                 print(error_message)
                 
-                # Check for quota errors
                 error_str = str(e)
-                if "429" in error_str or "402" in error_str or "Resource has been exhausted" in error_str or "Quota exceeded" in error_str or "RESOURCE_EXHAUSTED" in error_str:
+                if any(err in error_str for err in ["429", "402", "Resource has been exhausted", "Quota exceeded", "RESOURCE_EXHAUSTED"]):
                     print(f"🚨 CRITICAL: Gemini Flash Image API Quota Exceeded!")
-                    send_quota_alert_email(f"Gemini Flash Image API Quota Exceeded: {error_str}")
+                    # send_quota_alert_email(f"Gemini Flash Image API Quota Exceeded: {error_str}")
                     break
 
-                # Check if this is a retryable error
-                is_retryable = ("No parts returned from Gemini Flash Image" in error_str or 
-                              "No image data found in response parts" in error_str or
-                              "timeout" in error_str.lower())
+                # 4. FIX: Broader retry condition to catch intermittent API drops
+                is_retryable = (
+                    "No parts returned" in error_str or 
+                    "No image data found" in error_str or
+                    "timeout" in error_str.lower() or
+                    "503" in error_str or
+                    "500" in error_str
+                )
                 
                 if is_retryable and attempt < max_retries:
                     print(f"[INFO] Retrying in {retry_delay} seconds...")
                     sleep(retry_delay)
                 else:
-                    # Either not retryable or max retries reached
                     if attempt == max_retries:
-                        error_message = f"Gemini Flash Image Error: Failed after {max_retries} attempts - {str(e)}"
-                        print(f"[ERROR] {error_message}")
+                        print(f"[ERROR] Failed after {max_retries} attempts - {str(e)}")
                     break
 
     finally:
+        # Assuming your tracker is properly imported
         from publication.message_tracker import add_message, MessageStage, MessageStatus
         add_message(
             types,
             MessageStage.IMAGE_GENERATION,
             MessageStatus.SUCCESS if image_generated else MessageStatus.ERROR,
-            "Image generated successfully using Gemini 3.1 Flash Image Preview" if image_generated else "Image generation failed",
+            "Image generated successfully" if image_generated else f"Image generation failed: {error_message}",
             error_details=None if image_generated else error_message,
         )

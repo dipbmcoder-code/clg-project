@@ -27,7 +27,7 @@ router.get('/stats', async (req, res) => {
 
     // Active scrapers (active + social media enabled)
     const { rows: wActive } = await client.query(
-      'SELECT COUNT(*)::int AS count FROM websites WHERE active = true AND (enable_social_media = true OR enable_reddit = true)'
+      'SELECT COUNT(*)::int AS count FROM websites WHERE active = true AND (enable_x = true OR enable_reddit = true)'
     );
     stats.active_scrapers = wActive[0].count;
 

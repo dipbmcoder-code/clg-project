@@ -245,10 +245,12 @@ def main_publication2(data, types, key, website, image_ready=True):
         return None
 
     # Determine categories
-    # Copy social_media_categories to categories as expected by publish logic
+    # Copy x_categories to categories as expected by publish logic
     website.setdefault('categories', [])
-    if website.get('social_media_categories'):
-        website['categories'] = website['social_media_categories']
+    if website.get('x_categories'):
+        website['categories'] = website['x_categories']
+    if website.get('reddit_categories'):
+        website['categories'] = website['reddit_categories']    
 
     # Extract Data
     handler = data.get('handler') or data.get('source_handle') or 'Unknown'

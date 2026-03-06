@@ -41,7 +41,7 @@ def get_websites_from_db():
         with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
             cur.execute("""
                 SELECT * FROM websites 
-                WHERE active = true AND is_validated = true AND enable_social_media = true
+                WHERE active = true AND is_validated = true AND (enable_x = true OR enable_reddit = true)
             """)
             return [dict(w) for w in cur.fetchall()]
     except Exception as e:
@@ -123,14 +123,15 @@ for w in websites:
 handles = set()
 subreddits = set()
 for w in websites:
-    for h in (w.get("twitter_handles") or []):
-        val = None
-        if isinstance(h, str) and h.strip():
-            val = h.strip().replace("@", "")
-        elif isinstance(h, dict):
-            val = (h.get("value") or h.get("label") or "").strip().replace("@", "")
-        if val:
-            handles.add(val)
+    if w.get("enable_x"):
+        for h in (w.get("twitter_handles") or []):
+            val = None
+            if isinstance(h, str) and h.strip():
+                val = h.strip().replace("@", "")
+            elif isinstance(h, dict):
+                val = (h.get("value") or h.get("label") or "").strip().replace("@", "")
+            if val:
+                handles.add(val)
 
     if w.get("enable_reddit"):
         for s in (w.get("reddit_subreddits") or []):

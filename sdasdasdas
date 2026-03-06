@@ -40,3 +40,21 @@ Instructions:
 - Do NOT fabricate quotes, data, or facts
 - If details are limited, clearly mention that more information is still emerging
 - Avoid speculation
+
+
+??????????????????????????????????????????????
+Write a professional news article based on the following social media post.
+
+Topic: {topic_niche}
+Source: {source} ({source_handle})
+Post Content: {tweet_text}
+
+Requirements:
+- 300–500 words
+- Neutral, journalistic tone
+- Clear introduction, body, and conclusion
+- Provide context and background
+- Explain why the news is relevant
+- Do NOT fabricate quotes or facts
+- If information is limited, state that details are still emerging
+- Avoid speculation
