@@ -26,6 +26,12 @@ const reducer = (state, action) => {
       user: action.payload.user,
     };
   }
+  if (action.type === 'REGISTER') {
+    return {
+      ...state,
+      user: action.payload.user,
+    };
+  }
   if (action.type === 'LOGOUT') {
     return {
       ...state,
@@ -107,6 +113,31 @@ export function AuthProvider({ children }) {
     });
   }, []);
 
+  // REGISTER
+  const register = useCallback(async (firstname, lastname, email, password) => {
+    const data = {
+      firstname,
+      lastname,
+      email,
+      password,
+    };
+    const response = await axios.post(endpoints.auth.register, data);
+
+    const { token, user } = response.data.data;
+    setSession(token);
+    setCookie(STORAGE_KEY, token, 3);
+
+    dispatch({
+      type: 'REGISTER',
+      payload: {
+        user: {
+          ...user,
+          token,
+        },
+      },
+    });
+  }, []);
+
   // LOGOUT
   const logout = useCallback(async () => {
     setSession(null);
@@ -130,9 +161,10 @@ export function AuthProvider({ children }) {
       unauthenticated: status === 'unauthenticated',
       //
       login,
+      register,
       logout,
     }),
-    [login, logout, state.user, status]
+    [login, register, logout, state.user, status]
   );
 
   return <AuthContext.Provider value={memoizedValue}>{children}</AuthContext.Provider>;

@@ -55,6 +55,57 @@ class AuthController {
     }
 
     /**
+     * Register a new user account.
+     */
+    static async register(req, res) {
+        const { firstname, lastname, email, password } = req.body;
+
+        try {
+            // Check if email already exists
+            const existing = await User.findByEmail(email);
+            if (existing) {
+                return res.status(409).json({
+                    error: { status: 409, message: 'An account with this email already exists' },
+                });
+            }
+
+            const pwHash = hashPassword(password);
+
+            const newUser = await User.create({
+                firstname,
+                lastname,
+                email,
+                password_hash: pwHash,
+                role: 'Admin',
+                is_active: true,
+            });
+
+            // Auto-login: generate token so the user is logged in immediately
+            const token = createToken({
+                user_id: newUser.id,
+                email: newUser.email,
+                role: newUser.role,
+            });
+
+            return res.status(201).json({
+                data: {
+                    token,
+                    user: {
+                        id: newUser.id,
+                        firstname: newUser.firstname,
+                        lastname: newUser.lastname,
+                        email: newUser.email,
+                        roles: [{ name: newUser.role }],
+                    },
+                },
+            });
+        } catch (err) {
+            console.error('Register error:', err);
+            return res.status(500).json({ error: { status: 500, message: 'Internal server error' } });
+        }
+    }
+
+    /**
      * Get current authenticated user profile.
      */
     static async me(req, res) {

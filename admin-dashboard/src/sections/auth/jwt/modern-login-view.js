@@ -5,12 +5,16 @@ import { useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { yupResolver } from '@hookform/resolvers/yup';
 
+import Link from '@mui/material/Link';
 import Stack from '@mui/material/Stack';
 import Alert from '@mui/material/Alert';
 import IconButton from '@mui/material/IconButton';
 import Typography from '@mui/material/Typography';
 import LoadingButton from '@mui/lab/LoadingButton';
 import InputAdornment from '@mui/material/InputAdornment';
+
+import { paths } from 'src/routes/paths';
+import { RouterLink } from 'src/routes/components';
 
 import { useBoolean } from 'src/hooks/use-boolean';
 
@@ -51,7 +55,7 @@ export default function ModernLoginView() {
       await login?.(data.email, data.password);
     } catch (error) {
       reset();
-      
+
       // Handle various error shapes from axios interceptor
       if (typeof error === 'string') {
         setErrorMsg(error);
@@ -68,6 +72,19 @@ export default function ModernLoginView() {
   const renderHead = (
     <Stack spacing={2} sx={{ mb: 5 }}>
       <Typography variant="h4">Sign in to AI News Generator</Typography>
+
+      <Stack direction="row" spacing={0.5}>
+        <Typography variant="body2">Don&apos;t have an account?</Typography>
+
+        <Link
+          component={RouterLink}
+          href={paths.auth.register}
+          variant="subtitle2"
+          sx={{ color: 'primary.main' }}
+        >
+          Create account
+        </Link>
+      </Stack>
     </Stack>
   );
 

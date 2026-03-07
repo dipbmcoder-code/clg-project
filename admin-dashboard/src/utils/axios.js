@@ -18,6 +18,7 @@ export const endpoints = {
   auth: {
     me: '/api/auth/me',
     login: '/api/auth/login',
+    register: '/api/auth/register',
   },
   websites: {
     list: '/api/websites',

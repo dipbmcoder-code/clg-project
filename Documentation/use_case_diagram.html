@@ -1,0 +1,99 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI News Generator Use Case Diagram</title>
+    <script src="https://cdn.jsdelivr.net/npm/mermaid/dist/mermaid.min.js"></script>
+    <script>
+        mermaid.initialize({ startOnLoad: true });
+    </script>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            margin: 0;
+            background-color: #f4f4f4;
+        }
+        .container {
+            background-color: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+            text-align: center;
+        }
+        h1 {
+            color: #333;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Use Case Diagram: AI News Generator</h1>
+        <div class="mermaid">
+        usecaseDiagram
+            actor "Admin" as admin
+            actor "Registered User" as user
+            actor "News Engine (System)" as system
+
+            package "Authentication" {
+                usecase "Login" as UC1
+                usecase "Register" as UC2
+                usecase "Logout" as UC3
+            }
+
+            package "Content Management" {
+                usecase "Manage Posts" as UC4
+                usecase "Manage Prompts" as UC5
+                usecase "Manage Websites" as UC6
+                usecase "Edit Post" as UC4a
+                usecase "Delete Post" as UC4b
+                UC4 <|-- UC4a
+                UC4 <|-- UC4b
+            }
+
+            package "Automated News Pipeline" {
+                usecase "Scrape News Sources" as UC7
+                usecase "Generate Content (AI)" as UC8
+                usecase "Publish to WordPress" as UC9
+                usecase "Social Media Sharing" as UC13
+            }
+
+            package "Administration" {
+                usecase "Manage Users" as UC10
+                usecase "View System Logs" as UC11
+                usecase "View Analytics Dashboard" as UC12
+            }
+
+            %% Admin Relationships
+            admin --> UC1
+            admin --> UC3
+            admin --> UC4
+            admin --> UC5
+            admin --> UC6
+            admin --> UC10
+            admin --> UC11
+            admin --> UC12
+
+            %% User Relationships
+            user --> UC1
+            user --> UC2
+            user --> UC3
+
+            %% System Relationships
+            system --> UC7
+            system --> UC8
+            system --> UC9
+            system --> UC13
+            
+            %% System interactions with data managed by Admin
+            UC8 ..> UC5 : <<uses>>
+            UC9 ..> UC6 : <<uses>>
+        </div>
+        <p style="margin-top: 20px; color: #666;">Use your browser's print function to save as PDF or screenshot tool to save as PNG/JPG.</p>
+    </div>
+</body>
+</html>
