@@ -84,7 +84,7 @@ function Website({
 
   // Fetch WP categories & authors if credentials are validated
   const fetchWPData = useCallback(async () => {
-    if (!data?.id || !data?.is_validated) return;
+    if (!data?.id || !isValidated) return;
 
     setWpLoading(true);
     setWpError('');
@@ -105,7 +105,7 @@ function Website({
     } finally {
       setWpLoading(false);
     }
-  }, [data?.id, data?.is_validated]);
+  }, [data?.id, isValidated]);
 
   useEffect(() => {
     fetchWPData();
@@ -121,12 +121,15 @@ function Website({
       });
       if (res.data?.data?.validated) {
         setIsValidated(true);
-        // Refetch categories & authors after successful validation
-        setTimeout(() => fetchWPData(), 500);
+        // useEffect will auto-trigger fetchWPData when isValidated changes
       }
     } catch (err) {
       setIsValidated(false);
-      const msg = err?.error?.message || err?.message || 'Validation failed';
+      const msg =
+        (typeof err === 'object' && err?.error?.message) ||
+        (typeof err === 'object' && err?.message) ||
+        (typeof err === 'string' && err) ||
+        'Validation failed';
       setWpError(msg);
     } finally {
       setWpValidating(false);

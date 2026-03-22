@@ -31,9 +31,21 @@ function wpAuthHeader(user, password) {
  * Make a request to a WordPress REST API endpoint.
  */
 async function wpFetch(siteUrl, path, { user, password, method = 'GET', body = null } = {}) {
-  // Normalize URL
-  const base = siteUrl.replace(/\/+$/, '');
-  const url = `${base}/wp-json/wp/v2${path}`;
+  // Normalize URL — strip trailing slashes and common WP paths users accidentally include
+  const base = siteUrl
+    .replace(/\/+$/, '')
+    .replace(/\/(wp-login\.php|wp-admin|wp-json)(\/.*)?$/i, '');
+
+  // Build URL: try pretty permalink first (/wp-json/wp/v2/...),
+  // fall back to ?rest_route= if the pretty URL returns 404.
+  const prettyUrl = `${base}/wp-json/wp/v2${path}`;
+
+  // Determine the ?rest_route= fallback URL
+  // path may contain query params like "?per_page=100&page=1"
+  const [pathPart, queryPart] = path.split('?');
+  const restRouteUrl = queryPart
+    ? `${base}/?rest_route=/wp/v2${pathPart}&${queryPart}`
+    : `${base}/?rest_route=/wp/v2${pathPart}`;
 
   const headers = {
     'Content-Type': 'application/json',
@@ -49,15 +61,28 @@ async function wpFetch(siteUrl, path, { user, password, method = 'GET', body = n
     opts.body = JSON.stringify(body);
   }
 
-  const res = await fetch(url, opts);
+  // Try pretty URL first
+  let res = await fetch(prettyUrl, opts);
+
+  // If 404, try ?rest_route= fallback (plain permalinks)
+  if (res.status === 404) {
+    console.log(`[wpFetch] Pretty URL returned 404, trying ?rest_route= fallback`);
+    res = await fetch(restRouteUrl, opts);
+  }
+
+  const finalUrl = res.url || (res.status === 404 ? restRouteUrl : prettyUrl);
   const text = await res.text();
 
   let data;
   try {
     data = JSON.parse(text);
   } catch {
-    data = { raw: text };
+    data = { raw: text.substring(0, 500) };
   }
+
+  // Debug: log WP response shape
+  const shape = Array.isArray(data) ? `array[${data.length}]` : (typeof data === 'object' && data !== null ? `object{${Object.keys(data).join(',')}}` : typeof data);
+  console.log(`[wpFetch] ${method} ${finalUrl} → HTTP ${res.status} | response: ${shape}`);
 
   if (!res.ok) {
     const msg = data?.message || data?.raw || `HTTP ${res.status}`;
@@ -163,6 +188,13 @@ router.get('/categories', async (req, res) => {
         { user: site.platform_user, password: site.platform_password }
       );
 
+      if (!Array.isArray(cats)) {
+        const msg = cats?.message || 'WordPress returned an unexpected response for categories';
+        const err = new Error(msg);
+        err.status = 400;
+        throw err;
+      }
+
       allCategories = allCategories.concat(
         cats.map((c) => ({
           id: c.id,
@@ -210,6 +242,13 @@ router.get('/authors', async (req, res) => {
       '/users?per_page=100&roles=administrator,editor,author',
       { user: site.platform_user, password: site.platform_password }
     );
+
+    if (!Array.isArray(authors)) {
+      const msg = authors?.message || 'WordPress returned an unexpected response for authors';
+      const err = new Error(msg);
+      err.status = 400;
+      throw err;
+    }
 
     return res.json({
       data: authors.map((a) => ({

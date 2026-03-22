@@ -15,6 +15,31 @@ from publication.message_tracker import add_message, MessageStage, MessageStatus
 load_dotenv()
 root_folder = Path(__file__).resolve().parents[1]
 
+import re
+
+def _normalize_wp_base(url):
+    """Strip trailing slashes and common WP paths from a site URL."""
+    url = url.strip().rstrip('/')
+    url = re.sub(r'/(wp-login\.php|wp-admin|wp-json)(/.*)?$', '', url, flags=re.IGNORECASE)
+    return url
+
+def wp_api_url(site_url, rest_path, header):
+    """
+    Build a working WP REST API URL.
+    Tries pretty permalink (/wp-json/wp/v2/...) first;
+    falls back to ?rest_route= if 404.
+    """
+    base = _normalize_wp_base(site_url)
+    pretty = f"{base}/wp-json/wp/v2{rest_path}"
+    try:
+        r = requests.head(pretty, headers=header, timeout=5)
+        if r.status_code != 404:
+            return pretty
+    except Exception:
+        pass
+    # Fallback: ?rest_route=
+    return f"{base}/?rest_route=/wp/v2{rest_path}"
+
 def publish(data_j, title, text_all, types, key, l_version, **kwargs):
     """
     Publish content to WordPress via REST API.
@@ -97,9 +122,10 @@ def publish(data_j, title, text_all, types, key, l_version, **kwargs):
             
             if os.path.exists(img_path):
                 print(f"📤 Uploading image: {img_path}")
+                media_url = wp_api_url(url, '/media', header)
                 img_id = upload_image_to_wordpress(
                     img_path,
-                    url + '/wp-json/wp/v2/media',
+                    media_url,
                     header, key, types
                 )
                 print(f"✅ Image ID: {img_id}")
@@ -113,7 +139,8 @@ def publish(data_j, title, text_all, types, key, l_version, **kwargs):
                 post['author'] = author_id
 
         # Send Post Request
-        response = requests.post(url + '/wp-json/wp/v2/posts', headers=header, json=post)
+        posts_url = wp_api_url(url, '/posts', header)
+        response = requests.post(posts_url, headers=header, json=post)
         
         if response.status_code >= 400:
              raise Exception(f"WP API Error {response.status_code}: {response.text}")

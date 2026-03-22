@@ -1,5 +1,16 @@
 const pool = require('../config/db');
 
+/**
+ * Normalize a WordPress site URL — strip trailing slashes and
+ * common WP paths that users sometimes paste by mistake.
+ */
+function normalizeWpUrl(url) {
+    if (!url) return url;
+    return url.trim()
+        .replace(/\/+$/, '')
+        .replace(/\/(wp-login\.php|wp-admin|wp-json)(\/.*)?$/i, '');
+}
+
 class Website {
     static async findAll({ whereClause = '', params = [], sortField = 'created_at', sortDir = 'DESC', limit = 25, offset = 0 }) {
         // Check sort safety
@@ -30,6 +41,9 @@ class Website {
     }
 
     static async create(data) {
+        // Normalize WordPress URL before saving
+        if (data.platform_url) data.platform_url = normalizeWpUrl(data.platform_url);
+
         // Map data fields to columns
         const columns = [
             'platform_name', 'platform_url', 'platform_user', 'platform_password',
@@ -65,6 +79,9 @@ class Website {
     }
 
     static async update(id, data) {
+        // Normalize WordPress URL before saving
+        if (data.platform_url) data.platform_url = normalizeWpUrl(data.platform_url);
+
         const fields = [];
         const values = [];
         let idx = 1;
