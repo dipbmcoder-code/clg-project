@@ -8,6 +8,7 @@ import os
 import json
 import time
 import random
+import subprocess
 import traceback
 from pathlib import Path
 from datetime import datetime, timezone
@@ -28,6 +29,42 @@ load_dotenv()
 
 ROOT = Path(__file__).resolve().parents[1]
 COOKIE_FILE = ROOT / "x_cookies.json"
+
+
+def _get_chrome_major_version() -> Optional[int]:
+    """
+    Detect the installed Chrome major version at runtime.
+    Returns an int (e.g. 146) or None if detection fails.
+    Passing this to uc.Chrome(version_main=...) avoids a network
+    download while still matching the actual installed browser.
+    """
+    candidates = [
+        "google-chrome",
+        "google-chrome-stable",
+        "chromium",
+        "chromium-browser",
+    ]
+    for cmd in candidates:
+        try:
+            out = subprocess.check_output(
+                [cmd, "--version"], stderr=subprocess.DEVNULL, timeout=5
+            ).decode()
+            # "Google Chrome 146.0.7680.153" → 146
+            parts = out.strip().split()
+            for part in reversed(parts):
+                major = part.split(".")[0]
+                if major.isdigit():
+                    return int(major)
+        except Exception:
+            continue
+    return None
+
+
+_CHROME_MAJOR = _get_chrome_major_version()
+if _CHROME_MAJOR:
+    print(f"🌐 Detected Chrome {_CHROME_MAJOR} — using version_main={_CHROME_MAJOR}")
+else:
+    print("⚠️ Could not detect Chrome version — undetected-chromedriver will auto-detect")
 
 
 # ── Helpers ──
@@ -82,7 +119,7 @@ class XBrowser:
         options.add_argument("--disable-extensions")
         options.add_argument("--disable-blink-features=AutomationControlled")
 
-        self.driver = uc.Chrome(options=options, use_subprocess=True, version_main=144)
+        self.driver = uc.Chrome(options=options, use_subprocess=True, version_main=_CHROME_MAJOR)
         self.driver.set_page_load_timeout(60)
         print("🌐 Chrome started (undetected)")
 
@@ -477,6 +514,9 @@ class XBrowser:
                 time_el = el.select_one("time")
                 tid = self._tweet_id(el)
 
+                images = self._images(el)
+                permalink = f"https://x.com/{handle}/status/{tid}" if tid else None
+
                 tweets.append({
                     "twitter_id": tid,
                     "handler": handle,
@@ -485,8 +525,11 @@ class XBrowser:
                     "replies": self._metric(el, "reply"),
                     "retweets": self._metric(el, "retweet"),
                     "likes": self._metric(el, "like"),
-                    "images": self._images(el),
-                    "url": f"https://x.com/{handle}/status/{tid}" if tid else None,
+                    "images": images,
+                    "has_images": len(images) > 0,
+                    "image_count": len(images),
+                    "url": permalink,
+                    "permalink": permalink,
                     "scraped_at": datetime.now(timezone.utc).isoformat(),
                 })
             except Exception:
@@ -504,11 +547,63 @@ class XBrowser:
         return 0
 
     @staticmethod
+    def _normalize_img_url(src: str) -> str:
+        """Normalise a twimg URL to the largest available size."""
+        if not src or "twimg.com" not in src:
+            return src
+        # Drop the &name=<size> suffix so every URL is comparable
+        base = src.split("&name=")[0]
+        # If there is already a ?format= param, just ensure name=large is appended
+        if "?format=" in base:
+            return base + "&name=large"
+        # No format param yet — add one
+        return base + "?format=jpg&name=large"
+
+    @staticmethod
     def _images(el):
+        """
+        Collect every image URL visible in a tweet card.
+        Covers: embedded media, card preview images, video thumbnails,
+        quote-tweet images, and link-preview cards.
+        All twimg URLs are normalised to the largest available resolution.
+        """
+        seen = set()
         imgs = []
-        for img in el.select('img[src*="twimg.com/media"], img[src*="pbs.twimg.com/media"]'):
-            imgs.append(img["src"])
-        return list(dict.fromkeys(imgs))
+
+        def _add(url: str):
+            """Normalise and deduplicate before appending."""
+            if not url:
+                return
+            normalised = XBrowser._normalize_img_url(url)
+            if normalised not in seen:
+                seen.add(normalised)
+                imgs.append(normalised)
+
+        # 1. Primary embedded media (photos uploaded to X)
+        for img in el.select(
+            'img[src*="twimg.com/media"], img[src*="pbs.twimg.com/media"]'
+        ):
+            _add(img.get("src", ""))
+
+        # 2. Link/card preview images (Twitter Cards, news article previews)
+        for img in el.select(
+            'img[src*="card"], img[src*="twimg"][alt], '
+            'div[data-testid="card.layoutLarge.media"] img, '
+            'div[data-testid="card.layoutSmall.media"] img'
+        ):
+            _add(img.get("src", ""))
+
+        # 3. Video poster / thumbnail
+        for video in el.select('video[poster]'):
+            _add(video.get("poster", ""))
+
+        # 4. Quote-tweet embedded images (nested blockquote)
+        for inner in el.select('div[role="blockquote"] img, article img'):
+            src = inner.get("src", "")
+            if "twimg" in src:
+                _add(src)
+
+        return imgs
 
     @staticmethod
     def _tweet_id(el):

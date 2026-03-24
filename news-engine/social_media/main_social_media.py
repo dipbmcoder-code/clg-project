@@ -25,6 +25,7 @@ from publication.save_img_aws import save_image_locally
 from publication.utils import check_data_exists_in_db, check_is_posted, update_post_in_db
 from social_media.insert_social_media_api import insert_social_media_post, current_db_social_media_posts
 from social_media.image_social_media_api import generate_post_image
+from social_media.post_screenshot import capture_post_screenshot
 import publication.message_tracker as message_tracker
 import publication.module_failure_tracker as module_failure_tracker
 
@@ -321,28 +322,53 @@ for post in all_posts:
         workflow_success = False
 
         try:
-            # ── Step 1: Image generation (non-blocking) ──
-            # NOTE: generate_post_image → generate_gemini_image swallows exceptions
-            # internally (logs via message_tracker), so we MUST verify the file
-            # actually exists on disk rather than relying on exceptions.
-            image_ready = False
+            # ── Step 1: Screenshot of the original post (highest quality, real visual context) ──
+            screenshot_ready = False
             try:
-                generate_post_image(post, key, l_version, types, website=website)
-            except Exception as img_err:
-                print(f"⚠️ AI image generation threw: {img_err}")
+                print(f"📸 Attempting post screenshot for {post_id}...")
+                screenshot_path = os.path.join(IMG_MATCH_DIR, f"{l_version}_{key}_{types}.png")
+                screenshot_ready = capture_post_screenshot(
+                    post=post,
+                    output_path=screenshot_path,
+                )
+                if screenshot_ready:
+                    saved = save_image_locally(key, l_version, types)
+                    if not saved:
+                        screenshot_ready = False
+                        print(f"⚠️ Post screenshot capture succeeded but local save failed")
+                    else:
+                        print(f"✅ Post screenshot captured & saved")
+                        message_tracker.add_message(
+                            types,
+                            message_tracker.MessageStage.IMAGE_GENERATION,
+                            message_tracker.MessageStatus.SUCCESS,
+                            f"Post screenshot captured from {source} post",
+                        )
+            except Exception as sc_err:
+                print(f"⚠️ Post screenshot threw: {sc_err}")
 
-            # Verify the image file was actually created on disk
-            if _check_image_exists(key, l_version, types):
-                saved = save_image_locally(key, l_version, types)
-                if saved:
-                    image_ready = True
-                    print(f"✅ AI image generated & saved")
+            image_ready = screenshot_ready
+
+            # ── Step 2: AI image generation (if screenshot not available) ──
+            if not image_ready:
+                print(f"🤖 Screenshot not available — trying AI image generation...")
+                try:
+                    generate_post_image(post, key, l_version, types, website=website)
+                except Exception as img_err:
+                    print(f"⚠️ AI image generation threw: {img_err}")
+
+                # Verify the image file was actually created on disk
+                if _check_image_exists(key, l_version, types):
+                    saved = save_image_locally(key, l_version, types)
+                    if saved:
+                        image_ready = True
+                        print(f"✅ AI image generated & saved")
+                    else:
+                        print(f"⚠️ AI image generated but local save failed")
                 else:
-                    print(f"⚠️ AI image generated but local save failed")
-            else:
-                print(f"⚠️ AI image generation produced no file — will try fallback")
+                    print(f"⚠️ AI image generation produced no file — will try fallback")
 
-            # ── Step 2: Fallback to post's own images if AI image failed ──
+            # ── Step 3: Fallback to post's own embedded images if both failed ──
             if not image_ready:
                 print(f"🖼️ Attempting fallback: using post's embedded images...")
                 image_ready = _download_fallback_image(post, key, l_version, types)
@@ -359,7 +385,7 @@ for post in all_posts:
                         types,
                         message_tracker.MessageStage.IMAGE_GENERATION,
                         message_tracker.MessageStatus.ERROR,
-                        "No image available (AI gen failed + no post images). Publishing without image.",
+                        "No image available (screenshot + AI gen failed, no post images). Publishing without image.",
                     )
 
             # Brief delay before content generation to avoid API rate limits
